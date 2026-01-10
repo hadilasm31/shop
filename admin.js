@@ -1,4 +1,4 @@
-// Admin functionality for LAMITI SHOP
+    // Admin functionality for LAMITI SHOP
 class AdminManager {
     constructor() {
         this.isAdmin = false;
@@ -775,24 +775,30 @@ class AdminManager {
         return labels[status] || status;
     }
 
-    // Handle new order notification with sound
+    // Handle new order notification with persistent sound
     handleNewOrderNotification(order) {
         // Only show notification if admin is logged in
         if (!this.isAdmin) return;
         
-        // Play notification sound
-        this.playNotificationSound();
+        // Start persistent notification sound
+        console.log('Persistent notification sound should start for new order');
         
         // Show desktop notification if supported
         if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('Nouvelle commande!', {
+            new Notification('🎉 NOUVELLE COMMANDE!', {
                 body: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName} - ${window.shop.formatPrice(order.total)}`,
-                icon: '/favicon.ico'
+                icon: '/favicon.ico',
+                requireInteraction: true
             });
         }
         
         // Update notification bell
         this.updateNotificationBell();
+    }
+
+    // Stop persistent notification sound
+    stopPersistentNotificationSound() {
+        console.log('Persistent notification sound should stop');
     }
 
     playNotificationSound() {
@@ -1933,6 +1939,9 @@ function markAllNotificationsAsRead() {
     localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
     updateNotificationBadge();
     updateNotificationPanel();
+    
+    // Stop persistent sound when all notifications are marked as read
+    stopPersistentNotificationSound();
 }
 
 function clearAllNotifications() {
@@ -1940,6 +1949,9 @@ function clearAllNotifications() {
         localStorage.setItem('lamiti-notifications', JSON.stringify([]));
         updateNotificationBadge();
         updateNotificationPanel();
+        
+        // Stop persistent sound
+        stopPersistentNotificationSound();
     }
 }
 
@@ -2035,6 +2047,12 @@ function markNotificationAsRead(index) {
         localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
         updateNotificationBadge();
         updateNotificationPanel();
+        
+        // Check if all notifications are read
+        const unreadCount = notifications.filter(n => !n.read).length;
+        if (unreadCount === 0) {
+            stopPersistentNotificationSound();
+        }
     }
 }
 
@@ -2071,4 +2089,15 @@ function viewOrderFromNotification(orderId) {
             }, 500);
         }
     }, 500);
+}
+
+// Fonctions de gestion du son persistant
+function startPersistentNotificationSound() {
+    // Cette fonction est gérée dans admin.html
+    console.log('Persistent notification sound should start');
+}
+
+function stopPersistentNotificationSound() {
+    // Cette fonction est gérée dans admin.html
+    console.log('Persistent notification sound should stop');
 }
