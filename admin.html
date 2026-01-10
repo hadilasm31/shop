@@ -2285,7 +2285,12 @@
 
     <!-- Audio pour les notifications -->
     <audio id="notification-sound" preload="auto">
-        <source src="resources/natifmp3.mp3" type="audio/mpeg">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3" type="audio/mpeg">
+    </audio>
+    
+    <!-- Audio pour les notifications persistantes -->
+    <audio id="persistent-notification-sound" preload="auto" loop>
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3" type="audio/mpeg">
     </audio>
 
     <!-- JavaScript -->
@@ -2350,9 +2355,12 @@
         // Notification System
         let notifications = [];
         let notificationSound = null;
+        let persistentNotificationSound = null;
         let isNotificationPanelOpen = false;
         let notificationCheckInterval = null;
         let orderUpdateInterval = null;
+        let isPersistentSoundPlaying = false;
+        let lastPersistentNotificationId = null;
         
         function initNotificationSystem() {
             // Load existing notifications
@@ -2361,10 +2369,22 @@
             
             // Initialize audio
             notificationSound = document.getElementById('notification-sound');
+            persistentNotificationSound = document.getElementById('persistent-notification-sound');
+            
             if (notificationSound) {
                 notificationSound.volume = 0.5;
-                // Précharger le son
                 notificationSound.load();
+            }
+            
+            if (persistentNotificationSound) {
+                persistentNotificationSound.volume = 0.7;
+                persistentNotificationSound.load();
+            }
+            
+            // Check if there are unread notifications to resume persistent sound
+            const unreadCount = notifications.filter(n => !n.read).length;
+            if (unreadCount > 0 && !isNotificationPanelOpen) {
+                startPersistentNotificationSound();
             }
             
             // Start checking for new orders
@@ -2395,7 +2415,7 @@
             newOrders.forEach(order => {
                 addNotification({
                     type: 'new_order',
-                    title: 'Nouvelle commande!',
+                    title: '🎉 NOUVELLE COMMANDE!',
                     message: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName}`,
                     orderId: order.id,
                     orderTotal: order.total,
@@ -2403,14 +2423,47 @@
                     read: false
                 });
                 
-                // Play notification sound
-                playNotificationSound();
+                // Start persistent notification sound for new orders
+                startPersistentNotificationSound();
             });
             
             // Update last check time
             if (orders.length > 0) {
                 const latestOrder = orders[orders.length - 1];
                 localStorage.setItem('lamiti-last-order-check', new Date(latestOrder.orderDate).getTime());
+            }
+        }
+        
+        function startPersistentNotificationSound() {
+            if (isPersistentSoundPlaying) return;
+            
+            if (persistentNotificationSound) {
+                persistentNotificationSound.currentTime = 0;
+                persistentNotificationSound.play().then(() => {
+                    isPersistentSoundPlaying = true;
+                    console.log('Persistent notification sound started');
+                }).catch(e => {
+                    console.log('Persistent audio playback failed:', e);
+                    // Retry after user interaction
+                    document.addEventListener('click', function retryPlay() {
+                        persistentNotificationSound.play().then(() => {
+                            isPersistentSoundPlaying = true;
+                            console.log('Persistent notification sound started after interaction');
+                        }).catch(e => {
+                            console.log('Persistent audio playback failed again:', e);
+                        });
+                        document.removeEventListener('click', retryPlay);
+                    }, { once: true });
+                });
+            }
+        }
+        
+        function stopPersistentNotificationSound() {
+            if (persistentNotificationSound && isPersistentSoundPlaying) {
+                persistentNotificationSound.pause();
+                persistentNotificationSound.currentTime = 0;
+                isPersistentSoundPlaying = false;
+                console.log('Persistent notification sound stopped');
             }
         }
         
@@ -2432,7 +2485,7 @@
                     // Order status changed, show notification
                     addNotification({
                         type: 'order_update',
-                        title: 'Mise à jour de commande',
+                        title: '🔄 Mise à jour de commande',
                         message: `La commande ${updatedOrder.id} est maintenant "${getStatusLabel(updatedOrder.status)}"`,
                         orderId: updatedOrder.id,
                         orderStatus: updatedOrder.status,
@@ -2472,6 +2525,12 @@
             // Play sound for new notifications
             if (!notification.read) {
                 playNotificationSound();
+                
+                // Start persistent sound for unread notifications
+                if (notification.type === 'new_order') {
+                    lastPersistentNotificationId = notification.orderId;
+                    startPersistentNotificationSound();
+                }
             }
         }
         
@@ -2586,12 +2645,19 @@
             if (panel.classList.contains('show')) {
                 panel.classList.remove('show');
                 isNotificationPanelOpen = false;
+                
+                // Check if there are still unread notifications
+                const unreadCount = notifications.filter(n => !n.read).length;
+                if (unreadCount > 0) {
+                    // Resume persistent sound if there are still unread notifications
+                    startPersistentNotificationSound();
+                }
             } else {
                 panel.classList.add('show');
                 isNotificationPanelOpen = true;
                 
-                // Mark all as read when opening panel
-                markAllNotificationsAsRead();
+                // Stop persistent sound when panel opens
+                stopPersistentNotificationSound();
                 
                 // Stop bell animation
                 if (bell) {
@@ -2606,6 +2672,12 @@
                 localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
                 updateNotificationBadge();
                 updateNotificationPanel();
+                
+                // Check if all notifications are read
+                const unreadCount = notifications.filter(n => !n.read).length;
+                if (unreadCount === 0) {
+                    stopPersistentNotificationSound();
+                }
             }
         }
         
@@ -2616,6 +2688,9 @@
             localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
             updateNotificationBadge();
             updateNotificationPanel();
+            
+            // Stop persistent sound when all notifications are marked as read
+            stopPersistentNotificationSound();
         }
         
         function clearAllNotifications() {
@@ -2624,6 +2699,9 @@
                 localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
                 updateNotificationBadge();
                 updateNotificationPanel();
+                
+                // Stop persistent sound
+                stopPersistentNotificationSound();
             }
         }
         
@@ -2633,6 +2711,12 @@
             
             // Show orders section
             showSection('orders');
+            
+            // Mark this notification as read
+            const notificationIndex = notifications.findIndex(n => n.orderId === orderId);
+            if (notificationIndex !== -1) {
+                markNotificationAsRead(notificationIndex);
+            }
             
             // Find and highlight the order
             setTimeout(() => {
@@ -2669,6 +2753,13 @@
                 !bell.contains(event.target)) {
                 panel.classList.remove('show');
                 isNotificationPanelOpen = false;
+                
+                // Check if there are still unread notifications
+                const unreadCount = notifications.filter(n => !n.read).length;
+                if (unreadCount > 0) {
+                    // Resume persistent sound if there are still unread notifications
+                    startPersistentNotificationSound();
+                }
             }
         });
         
@@ -2680,6 +2771,7 @@
             if (orderUpdateInterval) {
                 clearInterval(orderUpdateInterval);
             }
+            stopPersistentNotificationSound();
         });
         
         // Order status update functions
