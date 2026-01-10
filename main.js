@@ -1,4 +1,4 @@
-// LAMITI SHOP - Main JavaScript
+    // LAMITI SHOP - Main JavaScript
 class LamitiShop {
     constructor() {
         this.products = [];
@@ -364,7 +364,7 @@ class LamitiShop {
         // Send confirmation email simulation
         this.sendOrderConfirmation(order);
 
-        // Trigger admin notification
+        // Trigger admin notification with persistent sound
         this.triggerAdminNotification(order);
 
         // Store customer order reference
@@ -524,7 +524,7 @@ class LamitiShop {
         return labels[status] || status;
     }
 
-    // Trigger admin notification for new order
+    // Trigger admin notification for new order with persistent sound
     triggerAdminNotification(order) {
         // Dispatch event for admin page
         const event = new CustomEvent('newOrderCreated', {
