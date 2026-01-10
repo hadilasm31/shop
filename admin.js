@@ -1,4 +1,4 @@
-    // Admin functionality for LAMITI SHOP
+// Admin functionality for LAMITI SHOP
 class AdminManager {
     constructor() {
         this.isAdmin = false;
@@ -775,39 +775,75 @@ class AdminManager {
         return labels[status] || status;
     }
 
-    // Handle new order notification with persistent sound
+    // Handle new order notification with continuous sound
     handleNewOrderNotification(order) {
         // Only show notification if admin is logged in
         if (!this.isAdmin) return;
         
-        // Start persistent notification sound
-        console.log('Persistent notification sound should start for new order');
+        // Add notification to system
+        const notification = {
+            type: 'new_order',
+            title: 'Nouvelle commande!',
+            message: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName} - ${window.shop.formatPrice(order.total)}`,
+            orderId: order.id,
+            orderTotal: order.total,
+            timestamp: new Date().toISOString(),
+            read: false
+        };
+        
+        // Dispatch event to add notification
+        const event = new CustomEvent('addAdminNotification', {
+            detail: { notification }
+        });
+        document.dispatchEvent(event);
         
         // Show desktop notification if supported
         if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('🎉 NOUVELLE COMMANDE!', {
+            new Notification('Nouvelle commande!', {
                 body: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName} - ${window.shop.formatPrice(order.total)}`,
-                icon: '/favicon.ico',
-                requireInteraction: true
+                icon: '/favicon.ico'
             });
         }
-        
-        // Update notification bell
-        this.updateNotificationBell();
     }
 
-    // Stop persistent notification sound
-    stopPersistentNotificationSound() {
-        console.log('Persistent notification sound should stop');
-    }
-
+    // Play notification sound (called from main notification system)
     playNotificationSound() {
         const notificationSound = document.getElementById('notification-sound');
         if (notificationSound) {
             notificationSound.currentTime = 0;
             notificationSound.play().catch(e => {
                 console.log('Audio playback failed:', e);
+                // Fallback to beep sound
+                this.playFallbackSound();
             });
+        } else {
+            // Fallback if sound element doesn't exist
+            this.playFallbackSound();
+        }
+    }
+
+    playFallbackSound() {
+        // Create a simple beep sound using Web Audio API
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            gainNode.gain.value = 0.5;
+            
+            oscillator.start();
+            
+            // Stop after 0.5 seconds
+            setTimeout(() => {
+                oscillator.stop();
+            }, 500);
+        } catch (e) {
+            console.log('Fallback sound failed:', e);
         }
     }
 
@@ -1370,6 +1406,12 @@ function markOrderNotificationAsRead(orderId) {
     // Update UI
     updateNotificationBadge();
     updateNotificationPanel();
+    
+    // Check if we should stop the sound
+    const remainingNewOrders = notifications.filter(n => !n.read && n.type === 'new_order').length;
+    if (remainingNewOrders === 0) {
+        stopNotificationSound();
+    }
 }
 
 function updateOrderStatus(orderId, newStatus) {
@@ -1909,6 +1951,14 @@ document.addEventListener('shopDataUpdate', function() {
     }
 });
 
+// Listen for admin notifications
+document.addEventListener('addAdminNotification', function(e) {
+    const { notification } = e.detail;
+    if (typeof addNotification === 'function') {
+        addNotification(notification);
+    }
+});
+
 // Notification functions from admin.html
 function toggleNotificationPanel() {
     const panel = document.getElementById('notification-panel');
@@ -1928,6 +1978,9 @@ function toggleNotificationPanel() {
         if (bell) {
             bell.classList.remove('ringing');
         }
+        
+        // Stop notification sound when panel is opened
+        stopNotificationSound();
     }
 }
 
@@ -1939,9 +1992,7 @@ function markAllNotificationsAsRead() {
     localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
     updateNotificationBadge();
     updateNotificationPanel();
-    
-    // Stop persistent sound when all notifications are marked as read
-    stopPersistentNotificationSound();
+    stopNotificationSound();
 }
 
 function clearAllNotifications() {
@@ -1949,9 +2000,7 @@ function clearAllNotifications() {
         localStorage.setItem('lamiti-notifications', JSON.stringify([]));
         updateNotificationBadge();
         updateNotificationPanel();
-        
-        // Stop persistent sound
-        stopPersistentNotificationSound();
+        stopNotificationSound();
     }
 }
 
@@ -2013,10 +2062,12 @@ function createNotificationHTML(notification, index, isUnread) {
             Voir la commande
         </span>` : '';
     
+    const icon = notification.type === 'new_order' ? '🛒' : '📦';
+    
     return `
         <div class="notification-item ${isUnread ? 'unread' : ''}" onclick="markNotificationAsRead(${index})">
             <div class="notification-item-title">
-                <span>${notification.title}</span>
+                <span>${icon} ${notification.title}</span>
                 <span class="notification-item-time">${timeAgo}</span>
             </div>
             <div class="notification-item-message">${notification.message}</div>
@@ -2043,15 +2094,18 @@ function getTimeAgo(timestamp) {
 function markNotificationAsRead(index) {
     const notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
     if (notifications[index]) {
+        const wasNewOrder = notifications[index].type === 'new_order' && !notifications[index].read;
         notifications[index].read = true;
         localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
         updateNotificationBadge();
         updateNotificationPanel();
         
-        // Check if all notifications are read
-        const unreadCount = notifications.filter(n => !n.read).length;
-        if (unreadCount === 0) {
-            stopPersistentNotificationSound();
+        // If this was a new order notification, check if we should stop the sound
+        if (wasNewOrder) {
+            const remainingNewOrders = notifications.filter(n => !n.read && n.type === 'new_order').length;
+            if (remainingNewOrders === 0) {
+                stopNotificationSound();
+            }
         }
     }
 }
@@ -2091,13 +2145,9 @@ function viewOrderFromNotification(orderId) {
     }, 500);
 }
 
-// Fonctions de gestion du son persistant
-function startPersistentNotificationSound() {
-    // Cette fonction est gérée dans admin.html
-    console.log('Persistent notification sound should start');
-}
-
-function stopPersistentNotificationSound() {
-    // Cette fonction est gérée dans admin.html
-    console.log('Persistent notification sound should stop');
+// Function to stop notification sound
+function stopNotificationSound() {
+    if (typeof window.stopNotificationSound === 'function') {
+        window.stopNotificationSound();
+    }
 }
