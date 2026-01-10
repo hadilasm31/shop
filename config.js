@@ -63,7 +63,8 @@ const CONFIG = {
         position: 'top-right',
         sound: {
             enabled: true,
-            volume: 1.0,
+            url: 'https://www.soundjay.com/buttons/beep-02.mp3',
+            volume: 0.7,
             loop: true
         }
     },
