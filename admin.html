@@ -1754,63 +1754,6 @@
                 min-width: auto;
             }
         }
-        
-        /* Styles pour le son qui tourne en boucle */
-        .notification-sound-alert {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #e74c3c;
-            color: white;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 2003;
-            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-            animation: pulse-alert 2s infinite;
-        }
-        
-        @keyframes pulse-alert {
-            0% {
-                transform: scale(1);
-                box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-            }
-            50% {
-                transform: scale(1.1);
-                box-shadow: 0 6px 20px rgba(231, 76, 60, 0.6);
-            }
-            100% {
-                transform: scale(1);
-                box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
-            }
-        }
-        
-        /* Clignotement pour les notifications non lues */
-        .notification-item.unread {
-            position: relative;
-        }
-        
-        .notification-item.unread::before {
-            content: '';
-            position: absolute;
-            left: 5px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 8px;
-            height: 8px;
-            background: #e74c3c;
-            border-radius: 50%;
-            animation: blink 2s infinite;
-        }
-        
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
     </style>
 </head>
 <body>
@@ -2340,854 +2283,694 @@
         </div>
     </div>
 
-    <!-- Audio pour les notifications - SON EN LIGNE -->
-    <audio id="notification-sound" preload="auto" loop>
-        <source src="https://www.soundjay.com/buttons/beep-02.mp3" type="audio/mpeg">
-    </audio>
+    <!-- Audio pour les notifications -->
+<audio id="notification-sound" preload="auto">
+    <source src="resources/natifmp3.mp3" type="audio/mpeg">
+</audio>
 
-    <!-- Indicateur de son actif -->
-    <div id="sound-alert-indicator" class="notification-sound-alert" style="display: none;" onclick="stopNotificationSound()">
-        🔕
-    </div>
-
+<!-- Audio pour les nouvelles commandes (son continu) -->
+<audio id="new-order-notification-sound" preload="auto" loop>
+    <source src="https://www.soundjay.com/buttons/button-2.mp3" type="audio/mpeg">
+</audio>
     <!-- JavaScript -->
     <script src="config.js"></script>
     <script src="main.js"></script>
     <script src="admin.js"></script>
     
-    
-
-<script>
-    // Load settings on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        const settings = JSON.parse(localStorage.getItem('lamiti-settings') || '{}');
-        if (settings.email) document.getElementById('site-email').value = settings.email;
-        if (settings.phone) document.getElementById('site-phone').value = settings.phone;
-        if (settings.address) document.getElementById('site-address').value = settings.address;
-        
-        // Initialize notification system
-        initNotificationSystem();
-        
-        // Initialize real-time order updates
-        initRealTimeOrderUpdates();
-        
-        // Initialize mobile views
-        initMobileViews();
-    });
-
-    function saveSettings() {
-        const email = document.getElementById('site-email').value;
-        const phone = document.getElementById('site-phone').value;
-        const address = document.getElementById('site-address').value;
-        
-        // Save to localStorage
-        const settings = { email, phone, address };
-        localStorage.setItem('lamiti-settings', JSON.stringify(settings));
-        
-        window.shop.showNotification('Paramètres enregistrés avec succès!', 'success');
-    }
-
-    function searchProducts(query) {
-        // Implement search functionality
-        console.log('Searching products:', query);
-        adminManager.loadAdminProducts();
-    }
-    
-    function searchOrders(query) {
-        // Implement search functionality
-        console.log('Searching orders:', query);
-        adminManager.loadAdminOrders();
-    }
-    
-    function searchCustomers(query) {
-        // Implement search functionality
-        console.log('Searching customers:', query);
-        adminManager.loadAdminCustomers();
-    }
-    
-    function filterOrdersByStatus(status) {
-        // Implement filter functionality
-        console.log('Filtering orders by status:', status);
-        adminManager.loadAdminOrders();
-    }
-    
-    // Notification System
-    let notifications = [];
-    let notificationSound = null;
-    let isNotificationPanelOpen = false;
-    let notificationCheckInterval = null;
-    let orderUpdateInterval = null;
-    let isSoundPlaying = false;
-    let soundAlertIndicator = null;
-    
-    function initNotificationSystem() {
-        // Load existing notifications
-        notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
-        updateNotificationBadge();
-        
-        // Initialize audio
-        notificationSound = document.getElementById('notification-sound');
-        if (notificationSound) {
-            notificationSound.volume = 0.7;
-            notificationSound.loop = true;
-            // Précharger le son
-            notificationSound.load();
-        }
-        
-        // Get sound alert indicator
-        soundAlertIndicator = document.getElementById('sound-alert-indicator');
-        
-        // Check if there are unread notifications that should trigger sound
-        checkSoundStatus();
-        
-        // Start checking for new orders
-        startOrderCheck();
-    }
-    
-    function checkSoundStatus() {
-        const unreadNewOrders = notifications.filter(n => !n.read && n.type === 'new_order').length;
-        
-        if (unreadNewOrders > 0 && !isNotificationPanelOpen && !isSoundPlaying) {
-            startNotificationSound();
-        } else if (unreadNewOrders === 0 || isNotificationPanelOpen) {
-            stopNotificationSound();
-        }
-    }
-    
-    function startOrderCheck() {
-        // Check for new orders every 5 seconds
-        notificationCheckInterval = setInterval(checkForNewOrders, 5000);
-        
-        // Check immediately on page load
-        checkForNewOrders();
-    }
-    
-    function checkForNewOrders() {
-        if (!window.shop || !window.shop.isAdmin) return;
-        
-        const orders = window.shop.orders || [];
-        const lastCheckTime = localStorage.getItem('lamiti-last-order-check') || 0;
-        
-        // Find new orders since last check
-        const newOrders = orders.filter(order => {
-            const orderTime = new Date(order.orderDate).getTime();
-            return orderTime > lastCheckTime && order.status === 'pending';
+    <script>
+        // Load settings on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const settings = JSON.parse(localStorage.getItem('lamiti-settings') || '{}');
+            if (settings.email) document.getElementById('site-email').value = settings.email;
+            if (settings.phone) document.getElementById('site-phone').value = settings.phone;
+            if (settings.address) document.getElementById('site-address').value = settings.address;
+            
+            // Initialize notification system
+            initNotificationSystem();
+            
+            // Initialize real-time order updates
+            initRealTimeOrderUpdates();
+            
+            // Initialize mobile views
+            initMobileViews();
         });
+
+        function saveSettings() {
+            const email = document.getElementById('site-email').value;
+            const phone = document.getElementById('site-phone').value;
+            const address = document.getElementById('site-address').value;
+            
+            // Save to localStorage
+            const settings = { email, phone, address };
+            localStorage.setItem('lamiti-settings', JSON.stringify(settings));
+            
+            window.shop.showNotification('Paramètres enregistrés avec succès!', 'success');
+        }
+
+        function searchProducts(query) {
+            // Implement search functionality
+            console.log('Searching products:', query);
+            adminManager.loadAdminProducts();
+        }
         
-        // Add notifications for new orders
-        newOrders.forEach(order => {
-            addNotification({
-                type: 'new_order',
-                title: 'Nouvelle commande!',
-                message: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName} - ${window.shop.formatPrice(order.total)}`,
-                orderId: order.id,
-                orderTotal: order.total,
-                timestamp: new Date().toISOString(),
-                read: false
+        function searchOrders(query) {
+            // Implement search functionality
+            console.log('Searching orders:', query);
+            adminManager.loadAdminOrders();
+        }
+        
+        function searchCustomers(query) {
+            // Implement search functionality
+            console.log('Searching customers:', query);
+            adminManager.loadAdminCustomers();
+        }
+        
+        function filterOrdersByStatus(status) {
+            // Implement filter functionality
+            console.log('Filtering orders by status:', status);
+            adminManager.loadAdminOrders();
+        }
+        
+        // Notification System
+        let notifications = [];
+        let notificationSound = null;
+        let isNotificationPanelOpen = false;
+        let notificationCheckInterval = null;
+        let orderUpdateInterval = null;
+        
+        function initNotificationSystem() {
+            // Load existing notifications
+            notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
+            updateNotificationBadge();
+            
+            // Initialize audio
+            notificationSound = document.getElementById('notification-sound');
+            if (notificationSound) {
+                notificationSound.volume = 0.5;
+                // Précharger le son
+                notificationSound.load();
+            }
+            
+            // Start checking for new orders
+            startOrderCheck();
+        }
+        
+        function startOrderCheck() {
+            // Check for new orders every 5 seconds
+            notificationCheckInterval = setInterval(checkForNewOrders, 5000);
+            
+            // Check immediately on page load
+            checkForNewOrders();
+        }
+        
+        function checkForNewOrders() {
+            if (!window.shop || !window.shop.isAdmin) return;
+            
+            const orders = window.shop.orders || [];
+            const lastCheckTime = localStorage.getItem('lamiti-last-order-check') || 0;
+            
+            // Find new orders since last check
+            const newOrders = orders.filter(order => {
+                const orderTime = new Date(order.orderDate).getTime();
+                return orderTime > lastCheckTime && order.status === 'pending';
             });
             
-            // Start notification sound if panel is not open
-            if (!isNotificationPanelOpen) {
-                startNotificationSound();
-            }
-        });
-        
-        // Update last check time
-        if (orders.length > 0) {
-            const latestOrder = orders[orders.length - 1];
-            localStorage.setItem('lamiti-last-order-check', new Date(latestOrder.orderDate).getTime());
-        }
-    }
-    
-    function initRealTimeOrderUpdates() {
-        // Check for order status updates every 3 seconds
-        orderUpdateInterval = setInterval(checkOrderStatusUpdates, 3000);
-    }
-    
-    function checkOrderStatusUpdates() {
-        if (!window.shop) return;
-        
-        // Load orders with status updates
-        const updatedOrders = JSON.parse(localStorage.getItem('lamiti-updated-orders') || '[]');
-        
-        updatedOrders.forEach(updatedOrder => {
-            const existingOrder = window.shop.orders.find(o => o.id === updatedOrder.id);
-            
-            if (existingOrder && existingOrder.status !== updatedOrder.status) {
-                // Order status changed, show notification
+            // Add notifications for new orders
+            newOrders.forEach(order => {
                 addNotification({
-                    type: 'order_update',
-                    title: 'Mise à jour de commande',
-                    message: `La commande ${updatedOrder.id} est maintenant "${getStatusLabel(updatedOrder.status)}"`,
-                    orderId: updatedOrder.id,
-                    orderStatus: updatedOrder.status,
+                    type: 'new_order',
+                    title: 'Nouvelle commande!',
+                    message: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName}`,
+                    orderId: order.id,
+                    orderTotal: order.total,
                     timestamp: new Date().toISOString(),
                     read: false
                 });
                 
-                // Update order in shop
-                existingOrder.status = updatedOrder.status;
-                existingOrder.statusHistory = updatedOrder.statusHistory;
-            }
-        });
-        
-        // Clear processed updates
-        localStorage.setItem('lamiti-updated-orders', JSON.stringify([]));
-    }
-    
-    function addNotification(notification) {
-        // Add notification to array
-        notifications.unshift(notification);
-        
-        // Keep only last 50 notifications
-        if (notifications.length > 50) {
-            notifications = notifications.slice(0, 50);
-        }
-        
-        // Save to localStorage
-        localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
-        
-        // Update UI
-        updateNotificationBadge();
-        updateNotificationPanel();
-        
-        // Start bell animation
-        startBellAnimation();
-        
-        // Play sound for new order notifications if panel is not open
-        if (!notification.read && notification.type === 'new_order' && !isNotificationPanelOpen) {
-            startNotificationSound();
-        }
-    }
-    
-    function startNotificationSound() {
-        if (notificationSound && !isSoundPlaying) {
-            notificationSound.currentTime = 0;
-            notificationSound.play().then(() => {
-                isSoundPlaying = true;
-                // Show sound alert indicator
-                if (soundAlertIndicator) {
-                    soundAlertIndicator.style.display = 'flex';
-                    soundAlertIndicator.innerHTML = '🔕';
-                    soundAlertIndicator.title = "Cliquez pour arrêter le son de notification";
-                }
-            }).catch(e => {
-                console.log('Audio playback failed:', e);
-                // Fallback to beep sound if online sound fails
-                playFallbackSound();
+                // Play notification sound
+                playNotificationSound();
             });
-        }
-    }
-    
-    function playFallbackSound() {
-        // Fallback beep sound using Web Audio API
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
             
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = 800;
-            oscillator.type = 'sine';
-            gainNode.gain.value = 0.5;
-            
-            oscillator.start();
-            
-            // Stop after 0.5 seconds
-            setTimeout(() => {
-                oscillator.stop();
-            }, 500);
-            
-            // Repeat every 2 seconds
-            if (!isSoundPlaying) {
-                const fallbackInterval = setInterval(() => {
-                    if (isSoundPlaying) {
-                        clearInterval(fallbackInterval);
-                    } else {
-                        playFallbackSound();
-                    }
-                }, 2000);
+            // Update last check time
+            if (orders.length > 0) {
+                const latestOrder = orders[orders.length - 1];
+                localStorage.setItem('lamiti-last-order-check', new Date(latestOrder.orderDate).getTime());
             }
-        } catch (e) {
-            console.log('Fallback sound failed:', e);
-        }
-    }
-    
-    function stopNotificationSound() {
-        if (notificationSound && isSoundPlaying) {
-            notificationSound.pause();
-            notificationSound.currentTime = 0;
-            isSoundPlaying = false;
-            
-            // Hide sound alert indicator
-            if (soundAlertIndicator) {
-                soundAlertIndicator.style.display = 'none';
-            }
-        }
-    }
-    
-    function toggleNotificationSound() {
-        if (isSoundPlaying) {
-            stopNotificationSound();
-        } else {
-            const unreadNewOrders = notifications.filter(n => !n.read && n.type === 'new_order').length;
-            if (unreadNewOrders > 0 && !isNotificationPanelOpen) {
-                startNotificationSound();
-            }
-        }
-    }
-    
-    function startBellAnimation() {
-        const bell = document.getElementById('notification-bell');
-        if (bell) {
-            bell.classList.add('ringing');
-            
-            // Stop animation after 3 seconds
-            setTimeout(() => {
-                bell.classList.remove('ringing');
-            }, 3000);
-        }
-    }
-    
-    function updateNotificationBadge() {
-        const unreadCount = notifications.filter(n => !n.read).length;
-        const badge = document.getElementById('notification-count');
-        const bell = document.getElementById('notification-bell');
-        
-        if (badge) {
-            badge.textContent = unreadCount;
-            badge.style.display = unreadCount > 0 ? 'flex' : 'none';
         }
         
-        if (bell) {
-            if (unreadCount > 0 && !isNotificationPanelOpen) {
+        function initRealTimeOrderUpdates() {
+            // Check for order status updates every 3 seconds
+            orderUpdateInterval = setInterval(checkOrderStatusUpdates, 3000);
+        }
+        
+        function checkOrderStatusUpdates() {
+            if (!window.shop) return;
+            
+            // Load orders with status updates
+            const updatedOrders = JSON.parse(localStorage.getItem('lamiti-updated-orders') || '[]');
+            
+            updatedOrders.forEach(updatedOrder => {
+                const existingOrder = window.shop.orders.find(o => o.id === updatedOrder.id);
+                
+                if (existingOrder && existingOrder.status !== updatedOrder.status) {
+                    // Order status changed, show notification
+                    addNotification({
+                        type: 'order_update',
+                        title: 'Mise à jour de commande',
+                        message: `La commande ${updatedOrder.id} est maintenant "${getStatusLabel(updatedOrder.status)}"`,
+                        orderId: updatedOrder.id,
+                        orderStatus: updatedOrder.status,
+                        timestamp: new Date().toISOString(),
+                        read: false
+                    });
+                    
+                    // Update order in shop
+                    existingOrder.status = updatedOrder.status;
+                    existingOrder.statusHistory = updatedOrder.statusHistory;
+                }
+            });
+            
+            // Clear processed updates
+            localStorage.setItem('lamiti-updated-orders', JSON.stringify([]));
+        }
+        
+        function addNotification(notification) {
+            // Add notification to array
+            notifications.unshift(notification);
+            
+            // Keep only last 50 notifications
+            if (notifications.length > 50) {
+                notifications = notifications.slice(0, 50);
+            }
+            
+            // Save to localStorage
+            localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+            
+            // Update UI
+            updateNotificationBadge();
+            updateNotificationPanel();
+            
+            // Start bell animation
+            startBellAnimation();
+            
+            // Play sound for new notifications
+            if (!notification.read) {
+                playNotificationSound();
+            }
+        }
+        
+        function playNotificationSound() {
+            if (notificationSound) {
+                notificationSound.currentTime = 0;
+                notificationSound.play().catch(e => {
+                    console.log('Audio playback failed:', e);
+                });
+            }
+        }
+        
+        function startBellAnimation() {
+            const bell = document.getElementById('notification-bell');
+            if (bell) {
                 bell.classList.add('ringing');
-            } else {
-                bell.classList.remove('ringing');
+                
+                // Stop animation after 3 seconds
+                setTimeout(() => {
+                    bell.classList.remove('ringing');
+                }, 3000);
             }
         }
-    }
-    
-    function updateNotificationPanel() {
-        const container = document.getElementById('notifications-list');
-        if (!container) return;
         
-        const unreadNotifications = notifications.filter(n => !n.read);
-        const readNotifications = notifications.filter(n => n.read);
+        function updateNotificationBadge() {
+            const unreadCount = notifications.filter(n => !n.read).length;
+            const badge = document.getElementById('notification-count');
+            const bell = document.getElementById('notification-bell');
+            
+            if (badge) {
+                badge.textContent = unreadCount;
+                badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+            }
+            
+            if (bell) {
+                if (unreadCount > 0 && !isNotificationPanelOpen) {
+                    bell.classList.add('ringing');
+                } else {
+                    bell.classList.remove('ringing');
+                }
+            }
+        }
         
-        let html = '';
+        function updateNotificationPanel() {
+            const container = document.getElementById('notifications-list');
+            if (!container) return;
+            
+            const unreadNotifications = notifications.filter(n => !n.read);
+            const readNotifications = notifications.filter(n => n.read);
+            
+            let html = '';
+            
+            // Unread notifications
+            unreadNotifications.forEach((notification, index) => {
+                html += createNotificationHTML(notification, index, true);
+            });
+            
+            // Read notifications
+            readNotifications.forEach((notification, index) => {
+                html += createNotificationHTML(notification, index + unreadNotifications.length, false);
+            });
+            
+            if (notifications.length === 0) {
+                html = `
+                    <div class="notification-item" style="text-align: center; color: #666;">
+                        Aucune notification
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        }
         
-        // Unread notifications
-        unreadNotifications.forEach((notification, index) => {
-            html += createNotificationHTML(notification, index, true);
-        });
-        
-        // Read notifications
-        readNotifications.forEach((notification, index) => {
-            html += createNotificationHTML(notification, index + unreadNotifications.length, false);
-        });
-        
-        if (notifications.length === 0) {
-            html = `
-                <div class="notification-item" style="text-align: center; color: #666;">
-                    Aucune notification
+        function createNotificationHTML(notification, index, isUnread) {
+            const timeAgo = getTimeAgo(notification.timestamp);
+            const orderLink = notification.orderId ? 
+                `<span class="notification-item-order" onclick="viewOrderFromNotification('${notification.orderId}')">
+                    Voir la commande
+                </span>` : '';
+            
+            return `
+                <div class="notification-item ${isUnread ? 'unread' : ''}" onclick="markNotificationAsRead(${index})">
+                    <div class="notification-item-title">
+                        <span>${notification.title}</span>
+                        <span class="notification-item-time">${timeAgo}</span>
+                    </div>
+                    <div class="notification-item-message">${notification.message}</div>
+                    ${orderLink}
                 </div>
             `;
         }
         
-        container.innerHTML = html;
-    }
-    
-    function createNotificationHTML(notification, index, isUnread) {
-        const timeAgo = getTimeAgo(notification.timestamp);
-        const orderLink = notification.orderId ? 
-            `<span class="notification-item-order" onclick="viewOrderFromNotification('${notification.orderId}')">
-                Voir la commande
-            </span>` : '';
-        
-        const icon = notification.type === 'new_order' ? '🛒' : '📦';
-        
-        return `
-            <div class="notification-item ${isUnread ? 'unread' : ''}" onclick="markNotificationAsRead(${index})">
-                <div class="notification-item-title">
-                    <span>${icon} ${notification.title}</span>
-                    <span class="notification-item-time">${timeAgo}</span>
-                </div>
-                <div class="notification-item-message">${notification.message}</div>
-                ${orderLink}
-            </div>
-        `;
-    }
-    
-    function getTimeAgo(timestamp) {
-        const now = new Date();
-        const past = new Date(timestamp);
-        const diffMs = now - past;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        
-        if (diffMins < 1) return "À l'instant";
-        if (diffMins < 60) return `Il y a ${diffMins} min`;
-        if (diffHours < 24) return `Il y a ${diffHours} h`;
-        if (diffDays < 7) return `Il y a ${diffDays} j`;
-        return past.toLocaleDateString('fr-FR');
-    }
-    
-    function toggleNotificationPanel() {
-        const panel = document.getElementById('notification-panel');
-        const bell = document.getElementById('notification-bell');
-        
-        if (panel.classList.contains('show')) {
-            // Fermer le panneau
-            panel.classList.remove('show');
-            isNotificationPanelOpen = false;
+        function getTimeAgo(timestamp) {
+            const now = new Date();
+            const past = new Date(timestamp);
+            const diffMs = now - past;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
             
-            // Vérifier s'il reste des notifications non lues de type new_order
-            const unreadNewOrders = notifications.filter(n => !n.read && n.type === 'new_order').length;
-            
-            // Si oui, redémarrer le son
-            if (unreadNewOrders > 0) {
-                startNotificationSound();
-            }
-            
-        } else {
-            // Ouvrir le panneau
-            panel.classList.add('show');
-            isNotificationPanelOpen = true;
-            
-            // Arrêter le son lorsque le panneau est ouvert
-            stopNotificationSound();
-            
-            // Stop bell animation
-            if (bell) {
-                bell.classList.remove('ringing');
-            }
+            if (diffMins < 1) return "À l'instant";
+            if (diffMins < 60) return `Il y a ${diffMins} min`;
+            if (diffHours < 24) return `Il y a ${diffHours} h`;
+            if (diffDays < 7) return `Il y a ${diffDays} j`;
+            return past.toLocaleDateString('fr-FR');
         }
-    }
-    
-    function markNotificationAsRead(index) {
-        if (notifications[index]) {
-            const wasNewOrder = notifications[index].type === 'new_order' && !notifications[index].read;
-            notifications[index].read = true;
-            localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
-            updateNotificationBadge();
-            updateNotificationPanel();
+        
+        function toggleNotificationPanel() {
+            const panel = document.getElementById('notification-panel');
+            const bell = document.getElementById('notification-bell');
             
-            // Si c'était une notification de nouvelle commande, vérifier s'il en reste
-            if (wasNewOrder) {
-                const remainingNewOrders = notifications.filter(n => !n.read && n.type === 'new_order').length;
+            if (panel.classList.contains('show')) {
+                panel.classList.remove('show');
+                isNotificationPanelOpen = false;
+            } else {
+                panel.classList.add('show');
+                isNotificationPanelOpen = true;
                 
-                // S'il n'y a plus de nouvelles commandes non lues, arrêter le son
-                if (remainingNewOrders === 0) {
-                    stopNotificationSound();
+                // Mark all as read when opening panel
+                markAllNotificationsAsRead();
+                
+                // Stop bell animation
+                if (bell) {
+                    bell.classList.remove('ringing');
                 }
             }
         }
-    }
-    
-    function markAllNotificationsAsRead() {
-        let hadUnreadNewOrders = false;
         
-        notifications.forEach(notification => {
-            if (!notification.read && notification.type === 'new_order') {
-                hadUnreadNewOrders = true;
+        function markNotificationAsRead(index) {
+            if (notifications[index]) {
+                notifications[index].read = true;
+                localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+                updateNotificationBadge();
+                updateNotificationPanel();
             }
-            notification.read = true;
-        });
-        
-        localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
-        updateNotificationBadge();
-        updateNotificationPanel();
-        
-        // Arrêter le son si on a marqué des nouvelles commandes comme lues
-        if (hadUnreadNewOrders) {
-            stopNotificationSound();
         }
-    }
-    
-    function clearAllNotifications() {
-        if (confirm('Êtes-vous sûr de vouloir effacer toutes les notifications ?')) {
-            const hadUnreadNewOrders = notifications.some(n => !n.read && n.type === 'new_order');
-            
-            notifications = [];
+        
+        function markAllNotificationsAsRead() {
+            notifications.forEach(notification => {
+                notification.read = true;
+            });
             localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
             updateNotificationBadge();
             updateNotificationPanel();
-            
-            // Arrêter le son si on a effacé des nouvelles commandes non lues
-            if (hadUnreadNewOrders) {
-                stopNotificationSound();
+        }
+        
+        function clearAllNotifications() {
+            if (confirm('Êtes-vous sûr de vouloir effacer toutes les notifications ?')) {
+                notifications = [];
+                localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+                updateNotificationBadge();
+                updateNotificationPanel();
             }
         }
-    }
-    
-    function viewOrderFromNotification(orderId) {
-        // Close notification panel
-        toggleNotificationPanel();
         
-        // Show orders section
-        showSection('orders');
-        
-        // Find and highlight the order
-        setTimeout(() => {
-            const orderRow = document.querySelector(`[data-order-id="${orderId}"]`);
-            if (orderRow) {
-                // Scroll to the order
-                orderRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
-                // Highlight the order
-                orderRow.style.backgroundColor = '#fff3cd';
-                setTimeout(() => {
-                    orderRow.style.backgroundColor = '';
-                }, 3000);
-                
-                // Open order details
-                viewOrderDetails(orderId);
-            } else {
-                // If order not found in current view, reload orders
-                adminManager.loadAdminOrders();
-                setTimeout(() => {
-                    viewOrderFromNotification(orderId);
-                }, 500);
-            }
-        }, 500);
-    }
-    
-    // Close notification panel when clicking outside
-    document.addEventListener('click', function(event) {
-        const panel = document.getElementById('notification-panel');
-        const bell = document.getElementById('notification-bell');
-        
-        if (panel && panel.classList.contains('show') && 
-            !panel.contains(event.target) && 
-            !bell.contains(event.target)) {
-            panel.classList.remove('show');
-            isNotificationPanelOpen = false;
+        function viewOrderFromNotification(orderId) {
+            // Close notification panel
+            toggleNotificationPanel();
             
-            // Vérifier s'il reste des notifications non lues de type new_order
-            const unreadNewOrders = notifications.filter(n => !n.read && n.type === 'new_order').length;
+            // Show orders section
+            showSection('orders');
             
-            // Si oui, redémarrer le son
-            if (unreadNewOrders > 0) {
-                startNotificationSound();
-            }
-        }
-    });
-    
-    // Stop notification check when leaving admin
-    window.addEventListener('beforeunload', function() {
-        if (notificationCheckInterval) {
-            clearInterval(notificationCheckInterval);
-        }
-        if (orderUpdateInterval) {
-            clearInterval(orderUpdateInterval);
-        }
-        stopNotificationSound();
-    });
-    
-    // Order status update functions
-    function openUpdateOrderStatusModal(orderId) {
-        const order = window.shop.orders.find(o => o.id === orderId);
-        if (!order) return;
-        
-        const content = `
-            <h3 class="mb-4" style="font-size: 1.1rem;">Mettre à jour le statut de la commande ${order.id}</h3>
-            <div class="timeline-track mb-6">
-                <div class="timeline-step">
-                    <div class="step-circle ${getStatusCircleClass(order.status, 'pending')}">1</div>
-                    <div class="step-label ${order.status === 'pending' ? 'active' : ''}">En attente</div>
-                </div>
-                <div class="timeline-step">
-                    <div class="step-circle ${getStatusCircleClass(order.status, 'confirmed')}">2</div>
-                    <div class="step-label ${order.status === 'confirmed' ? 'active' : ''}">Confirmée</div>
-                </div>
-                <div class="timeline-step">
-                    <div class="step-circle ${getStatusCircleClass(order.status, 'shipped')}">3</div>
-                    <div class="step-label ${order.status === 'shipped' ? 'active' : ''}">Expédiée</div>
-                </div>
-                <div class="timeline-step">
-                    <div class="step-circle ${getStatusCircleClass(order.status, 'delivered')}">4</div>
-                    <div class="step-label ${order.status === 'delivered' ? 'active' : ''}">Livrée</div>
-                </div>
-            </div>
-            
-            <div class="status-update-buttons">
-                <button class="status-btn pending ${order.status === 'pending' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'pending')">
-                    En attente
-                </button>
-                <button class="status-btn confirmed ${order.status === 'confirmed' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'confirmed')">
-                    Confirmée
-                </button>
-                <button class="status-btn shipped ${order.status === 'shipped' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'shipped')">
-                    Expédiée
-                </button>
-                <button class="status-btn delivered ${order.status === 'delivered' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'delivered')">
-                    Livrée
-                </button>
-                <button class="status-btn cancelled ${order.status === 'cancelled' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'cancelled')">
-                    Annulée
-                </button>
-            </div>
-            
-            <div class="mt-4">
-                <h4 style="font-size: 1rem;">Historique des statuts:</h4>
-                <div id="status-history-${orderId}" class="mt-2 space-y-2" style="font-size: 0.9rem;">
-                    ${order.statusHistory ? order.statusHistory.map(history => `
-                        <div class="text-sm">
-                            <span class="font-semibold">${getStatusLabel(history.status)}</span>
-                            <span class="text-gray-600"> - ${new Date(history.timestamp).toLocaleString('fr-FR')}</span>
-                            ${history.note ? `<div class="text-gray-500">${history.note}</div>` : ''}
-                        </div>
-                    `).join('') : '<div class="text-gray-500">Aucun historique disponible</div>'}
-                </div>
-            </div>
-            
-            <div class="mt-4">
-                <label class="form-label">Ajouter une note (optionnel)</label>
-                <textarea id="status-note-${orderId}" class="form-input form-textarea" placeholder="Ajouter une note pour ce changement de statut..."></textarea>
-            </div>
-            
-            <div class="mt-6 flex gap-2 flex-wrap">
-                <button class="add-product-btn flex-1" onclick="saveOrderStatus('${orderId}')">
-                    Enregistrer
-                </button>
-                <button class="add-product-btn bg-gray-600 hover:bg-gray-700 flex-1" onclick="closeUpdateOrderStatusModal()">
-                    Annuler
-                </button>
-            </div>
-        `;
-        
-        document.getElementById('update-order-status-content').innerHTML = content;
-        document.getElementById('update-order-status-modal').classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-    
-    function closeUpdateOrderStatusModal() {
-        document.getElementById('update-order-status-modal').classList.remove('active');
-        document.body.style.overflow = 'auto';
-    }
-    
-    function updateOrderStatus(orderId, newStatus) {
-        // This is just for UI preview, actual save happens in saveOrderStatus
-        const buttons = document.querySelectorAll('.status-btn');
-        buttons.forEach(btn => btn.classList.remove('active'));
-        
-        const activeBtn = document.querySelector(`.status-btn.${newStatus}`);
-        if (activeBtn) {
-            activeBtn.classList.add('active');
-        }
-    }
-    
-    function saveOrderStatus(orderId) {
-        const newStatus = document.querySelector('.status-btn.active')?.classList[1];
-        const note = document.getElementById(`status-note-${orderId}`)?.value;
-        
-        if (!newStatus) {
-            window.shop.showNotification('Veuillez sélectionner un statut', 'error');
-            return;
-        }
-        
-        // Update order status
-        if (window.shop.updateOrderStatus(orderId, newStatus, note)) {
-            closeUpdateOrderStatusModal();
-            
-            // Notify customer about status change
-            notifyCustomerOrderUpdate(orderId, newStatus);
-            
-            // Reload orders
-            adminManager.loadAdminOrders();
-            
-            window.shop.showNotification(`Statut mis à jour: ${getStatusLabel(newStatus)}`, 'success');
-        }
-    }
-    
-    function getStatusCircleClass(currentStatus, targetStatus) {
-        const statusOrder = ['pending', 'confirmed', 'shipped', 'delivered'];
-        const currentIndex = statusOrder.indexOf(currentStatus);
-        const targetIndex = statusOrder.indexOf(targetStatus);
-        
-        if (currentStatus === 'cancelled') {
-            return 'cancelled';
-        }
-        
-        if (targetIndex < currentIndex) {
-            return 'completed';
-        } else if (targetIndex === currentIndex) {
-            return 'active';
-        } else {
-            return '';
-        }
-    }
-    
-    function notifyCustomerOrderUpdate(orderId, newStatus) {
-        const order = window.shop.orders.find(o => o.id === orderId);
-        if (!order) return;
-        
-        // Store update for real-time notification
-        const updatedOrders = JSON.parse(localStorage.getItem('lamiti-updated-orders') || '[]');
-        updatedOrders.push(order);
-        localStorage.setItem('lamiti-updated-orders', JSON.stringify(updatedOrders));
-        
-        // You would typically send an email or SMS here
-        console.log(`Notification sent to ${order.customer.email}: Order ${orderId} is now ${newStatus}`);
-    }
-    
-    function getStatusLabel(status) {
-        const labels = {
-            'pending': 'En attente',
-            'confirmed': 'Confirmée',
-            'shipped': 'Expédiée',
-            'delivered': 'Livrée',
-            'cancelled': 'Annulée'
-        };
-        return labels[status] || status;
-    }
-    
-    // Mobile sidebar toggle - MODIFIÉ POUR ANIMATION HAMBURGER
-    function toggleSidebar() {
-        const sidebar = document.getElementById('admin-sidebar');
-        const hamburger = document.getElementById('mobile-hamburger');
-        
-        sidebar.classList.toggle('active');
-        hamburger.classList.toggle('active');
-    }
-    
-    // Initialize mobile views
-    function initMobileViews() {
-        if (window.innerWidth <= 768) {
-            // Load mobile views initially
+            // Find and highlight the order
             setTimeout(() => {
-                if (window.adminManager) {
-                    adminManager.loadMobileProducts();
-                    adminManager.loadMobileOrders();
-                    adminManager.loadMobileCustomers();
-                    adminManager.loadMobileLowStock();
+                const orderRow = document.querySelector(`[data-order-id="${orderId}"]`);
+                if (orderRow) {
+                    // Scroll to the order
+                    orderRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Highlight the order
+                    orderRow.style.backgroundColor = '#fff3cd';
+                    setTimeout(() => {
+                        orderRow.style.backgroundColor = '';
+                    }, 3000);
+                    
+                    // Open order details
+                    viewOrderDetails(orderId);
+                } else {
+                    // If order not found in current view, reload orders
+                    adminManager.loadAdminOrders();
+                    setTimeout(() => {
+                        viewOrderFromNotification(orderId);
+                    }, 500);
                 }
             }, 500);
         }
-    }
-    
-    // Show section with mobile support
-    function showSection(sectionName) {
-        // Hide all sections
-        document.querySelectorAll('.dashboard-section').forEach(section => {
-            section.classList.remove('active');
+        
+        // Close notification panel when clicking outside
+        document.addEventListener('click', function(event) {
+            const panel = document.getElementById('notification-panel');
+            const bell = document.getElementById('notification-bell');
+            
+            if (panel && panel.classList.contains('show') && 
+                !panel.contains(event.target) && 
+                !bell.contains(event.target)) {
+                panel.classList.remove('show');
+                isNotificationPanelOpen = false;
+            }
         });
         
-        // Show selected section
-        document.getElementById(sectionName + '-section').classList.add('active');
-        
-        // Update sidebar menu
-        document.querySelectorAll('.sidebar-link').forEach(link => {
-            link.classList.remove('active');
+        // Stop notification check when leaving admin
+        window.addEventListener('beforeunload', function() {
+            if (notificationCheckInterval) {
+                clearInterval(notificationCheckInterval);
+            }
+            if (orderUpdateInterval) {
+                clearInterval(orderUpdateInterval);
+            }
         });
         
-        // Find and activate the clicked link
-        const clickedLink = event?.target?.closest('.sidebar-link') || 
-            document.querySelector(`.sidebar-link[onclick*="${sectionName}"]`);
-        if (clickedLink) {
-            clickedLink.classList.add('active');
+        // Order status update functions
+        function openUpdateOrderStatusModal(orderId) {
+            const order = window.shop.orders.find(o => o.id === orderId);
+            if (!order) return;
+            
+            const content = `
+                <h3 class="mb-4" style="font-size: 1.1rem;">Mettre à jour le statut de la commande ${order.id}</h3>
+                <div class="timeline-track mb-6">
+                    <div class="timeline-step">
+                        <div class="step-circle ${getStatusCircleClass(order.status, 'pending')}">1</div>
+                        <div class="step-label ${order.status === 'pending' ? 'active' : ''}">En attente</div>
+                    </div>
+                    <div class="timeline-step">
+                        <div class="step-circle ${getStatusCircleClass(order.status, 'confirmed')}">2</div>
+                        <div class="step-label ${order.status === 'confirmed' ? 'active' : ''}">Confirmée</div>
+                    </div>
+                    <div class="timeline-step">
+                        <div class="step-circle ${getStatusCircleClass(order.status, 'shipped')}">3</div>
+                        <div class="step-label ${order.status === 'shipped' ? 'active' : ''}">Expédiée</div>
+                    </div>
+                    <div class="timeline-step">
+                        <div class="step-circle ${getStatusCircleClass(order.status, 'delivered')}">4</div>
+                        <div class="step-label ${order.status === 'delivered' ? 'active' : ''}">Livrée</div>
+                    </div>
+                </div>
+                
+                <div class="status-update-buttons">
+                    <button class="status-btn pending ${order.status === 'pending' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'pending')">
+                        En attente
+                    </button>
+                    <button class="status-btn confirmed ${order.status === 'confirmed' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'confirmed')">
+                        Confirmée
+                    </button>
+                    <button class="status-btn shipped ${order.status === 'shipped' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'shipped')">
+                        Expédiée
+                    </button>
+                    <button class="status-btn delivered ${order.status === 'delivered' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'delivered')">
+                        Livrée
+                    </button>
+                    <button class="status-btn cancelled ${order.status === 'cancelled' ? 'active' : ''}" onclick="updateOrderStatus('${orderId}', 'cancelled')">
+                        Annulée
+                    </button>
+                </div>
+                
+                <div class="mt-4">
+                    <h4 style="font-size: 1rem;">Historique des statuts:</h4>
+                    <div id="status-history-${orderId}" class="mt-2 space-y-2" style="font-size: 0.9rem;">
+                        ${order.statusHistory ? order.statusHistory.map(history => `
+                            <div class="text-sm">
+                                <span class="font-semibold">${getStatusLabel(history.status)}</span>
+                                <span class="text-gray-600"> - ${new Date(history.timestamp).toLocaleString('fr-FR')}</span>
+                                ${history.note ? `<div class="text-gray-500">${history.note}</div>` : ''}
+                            </div>
+                        `).join('') : '<div class="text-gray-500">Aucun historique disponible</div>'}
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <label class="form-label">Ajouter une note (optionnel)</label>
+                    <textarea id="status-note-${orderId}" class="form-input form-textarea" placeholder="Ajouter une note pour ce changement de statut..."></textarea>
+                </div>
+                
+                <div class="mt-6 flex gap-2 flex-wrap">
+                    <button class="add-product-btn flex-1" onclick="saveOrderStatus('${orderId}')">
+                        Enregistrer
+                    </button>
+                    <button class="add-product-btn bg-gray-600 hover:bg-gray-700 flex-1" onclick="closeUpdateOrderStatusModal()">
+                        Annuler
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('update-order-status-content').innerHTML = content;
+            document.getElementById('update-order-status-modal').classList.add('active');
+            document.body.style.overflow = 'hidden';
         }
         
-        // Close mobile sidebar if open
-        if (window.innerWidth <= 1024) {
+        function closeUpdateOrderStatusModal() {
+            document.getElementById('update-order-status-modal').classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+        
+        function updateOrderStatus(orderId, newStatus) {
+            // This is just for UI preview, actual save happens in saveOrderStatus
+            const buttons = document.querySelectorAll('.status-btn');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            const activeBtn = document.querySelector(`.status-btn.${newStatus}`);
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+            }
+        }
+        
+        function saveOrderStatus(orderId) {
+            const newStatus = document.querySelector('.status-btn.active')?.classList[1];
+            const note = document.getElementById(`status-note-${orderId}`)?.value;
+            
+            if (!newStatus) {
+                window.shop.showNotification('Veuillez sélectionner un statut', 'error');
+                return;
+            }
+            
+            // Update order status
+            if (window.shop.updateOrderStatus(orderId, newStatus, note)) {
+                closeUpdateOrderStatusModal();
+                
+                // Notify customer about status change
+                notifyCustomerOrderUpdate(orderId, newStatus);
+                
+                // Reload orders
+                adminManager.loadAdminOrders();
+                
+                window.shop.showNotification(`Statut mis à jour: ${getStatusLabel(newStatus)}`, 'success');
+            }
+        }
+        
+        function getStatusCircleClass(currentStatus, targetStatus) {
+            const statusOrder = ['pending', 'confirmed', 'shipped', 'delivered'];
+            const currentIndex = statusOrder.indexOf(currentStatus);
+            const targetIndex = statusOrder.indexOf(targetStatus);
+            
+            if (currentStatus === 'cancelled') {
+                return 'cancelled';
+            }
+            
+            if (targetIndex < currentIndex) {
+                return 'completed';
+            } else if (targetIndex === currentIndex) {
+                return 'active';
+            } else {
+                return '';
+            }
+        }
+        
+        function notifyCustomerOrderUpdate(orderId, newStatus) {
+            const order = window.shop.orders.find(o => o.id === orderId);
+            if (!order) return;
+            
+            // Store update for real-time notification
+            const updatedOrders = JSON.parse(localStorage.getItem('lamiti-updated-orders') || '[]');
+            updatedOrders.push(order);
+            localStorage.setItem('lamiti-updated-orders', JSON.stringify(updatedOrders));
+            
+            // You would typically send an email or SMS here
+            console.log(`Notification sent to ${order.customer.email}: Order ${orderId} is now ${newStatus}`);
+        }
+        
+        function getStatusLabel(status) {
+            const labels = {
+                'pending': 'En attente',
+                'confirmed': 'Confirmée',
+                'shipped': 'Expédiée',
+                'delivered': 'Livrée',
+                'cancelled': 'Annulée'
+            };
+            return labels[status] || status;
+        }
+        
+        // Mobile sidebar toggle - MODIFIÉ POUR ANIMATION HAMBURGER
+        function toggleSidebar() {
             const sidebar = document.getElementById('admin-sidebar');
             const hamburger = document.getElementById('mobile-hamburger');
-            sidebar.classList.remove('active');
-            hamburger.classList.remove('active');
+            
+            sidebar.classList.toggle('active');
+            hamburger.classList.toggle('active');
         }
         
-        // Load section content
-        switch(sectionName) {
-            case 'dashboard':
-                if (window.adminManager) {
-                    adminManager.loadDashboardStats();
-                    adminManager.initializeCharts();
-                    adminManager.loadCustomerStats();
-                }
-                break;
-            case 'products':
-                if (window.adminManager) {
-                    adminManager.loadAdminProducts();
-                    adminManager.loadMobileProducts();
-                }
-                break;
-            case 'categories':
-                if (window.adminManager) {
-                    adminManager.loadAdminCategories();
-                }
-                break;
-            case 'orders':
-                if (window.adminManager) {
-                    adminManager.loadAdminOrders();
-                    adminManager.loadMobileOrders();
-                }
-                break;
-            case 'customers':
-                if (window.adminManager) {
-                    adminManager.loadAdminCustomers();
-                    adminManager.loadMobileCustomers();
-                    adminManager.loadCustomerStats();
-                }
-                break;
-            case 'analytics':
-                loadDetailedAnalytics();
-                break;
-            case 'low-stock':
-                if (window.adminManager) {
-                    adminManager.loadLowStockProducts();
-                    adminManager.loadMobileLowStock();
-                }
-                break;
-        }
-    }
-    
-    // Handle window resize
-    window.addEventListener('resize', function() {
-        if (window.innerWidth <= 768) {
-            // Load mobile views if needed
-            if (window.adminManager) {
+        // Initialize mobile views
+        function initMobileViews() {
+            if (window.innerWidth <= 768) {
+                // Load mobile views initially
                 setTimeout(() => {
-                    adminManager.loadMobileProducts();
-                    adminManager.loadMobileOrders();
-                    adminManager.loadMobileCustomers();
-                    adminManager.loadMobileLowStock();
-                }, 300);
+                    if (window.adminManager) {
+                        adminManager.loadMobileProducts();
+                        adminManager.loadMobileOrders();
+                        adminManager.loadMobileCustomers();
+                        adminManager.loadMobileLowStock();
+                    }
+                }, 500);
             }
         }
-    });
-    
-    // Close sidebar when clicking outside on mobile
-    document.addEventListener('click', function(event) {
-        const sidebar = document.getElementById('admin-sidebar');
-        const hamburger = document.getElementById('mobile-hamburger');
         
-        if (window.innerWidth <= 1024 && 
-            sidebar.classList.contains('active') && 
-            !sidebar.contains(event.target) && 
-            !hamburger.contains(event.target)) {
-            sidebar.classList.remove('active');
-            hamburger.classList.remove('active');
-        }
-    });
-    
-    // Page visibility change - pause sound when tab is not active
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden && isSoundPlaying) {
-            // Tab is hidden, lower volume
-            if (notificationSound) {
-                notificationSound.volume = 0.3;
+        // Show section with mobile support
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.dashboard-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionName + '-section').classList.add('active');
+            
+            // Update sidebar menu
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Find and activate the clicked link
+            const clickedLink = event?.target?.closest('.sidebar-link') || 
+                document.querySelector(`.sidebar-link[onclick*="${sectionName}"]`);
+            if (clickedLink) {
+                clickedLink.classList.add('active');
             }
-        } else if (!document.hidden && isSoundPlaying) {
-            // Tab is visible again, restore volume
-            if (notificationSound) {
-                notificationSound.volume = 0.7;
+            
+            // Close mobile sidebar if open
+            if (window.innerWidth <= 1024) {
+                const sidebar = document.getElementById('admin-sidebar');
+                const hamburger = document.getElementById('mobile-hamburger');
+                sidebar.classList.remove('active');
+                hamburger.classList.remove('active');
+            }
+            
+            // Load section content
+            switch(sectionName) {
+                case 'dashboard':
+                    if (window.adminManager) {
+                        adminManager.loadDashboardStats();
+                        adminManager.initializeCharts();
+                        adminManager.loadCustomerStats();
+                    }
+                    break;
+                case 'products':
+                    if (window.adminManager) {
+                        adminManager.loadAdminProducts();
+                        adminManager.loadMobileProducts();
+                    }
+                    break;
+                case 'categories':
+                    if (window.adminManager) {
+                        adminManager.loadAdminCategories();
+                    }
+                    break;
+                case 'orders':
+                    if (window.adminManager) {
+                        adminManager.loadAdminOrders();
+                        adminManager.loadMobileOrders();
+                    }
+                    break;
+                case 'customers':
+                    if (window.adminManager) {
+                        adminManager.loadAdminCustomers();
+                        adminManager.loadMobileCustomers();
+                        adminManager.loadCustomerStats();
+                    }
+                    break;
+                case 'analytics':
+                    loadDetailedAnalytics();
+                    break;
+                case 'low-stock':
+                    if (window.adminManager) {
+                        adminManager.loadLowStockProducts();
+                        adminManager.loadMobileLowStock();
+                    }
+                    break;
             }
         }
-    });
-</script>
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth <= 768) {
+                // Load mobile views if needed
+                if (window.adminManager) {
+                    setTimeout(() => {
+                        adminManager.loadMobileProducts();
+                        adminManager.loadMobileOrders();
+                        adminManager.loadMobileCustomers();
+                        adminManager.loadMobileLowStock();
+                    }, 300);
+                }
+            }
+        });
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function(event) {
+            const sidebar = document.getElementById('admin-sidebar');
+            const hamburger = document.getElementById('mobile-hamburger');
+            
+            if (window.innerWidth <= 1024 && 
+                sidebar.classList.contains('active') && 
+                !sidebar.contains(event.target) && 
+                !hamburger.contains(event.target)) {
+                sidebar.classList.remove('active');
+                hamburger.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>
