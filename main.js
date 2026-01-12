@@ -315,7 +315,7 @@ class LamitiShop {
         }
     }
 
-    // Order Management
+    // Order Management - MODIFIÉ avec adminRead
     createOrder(customerInfo, shippingAddress, paymentMethod) {
         if (this.cart.length === 0) {
             this.showNotification('Votre panier est vide!', 'error');
@@ -341,7 +341,8 @@ class LamitiShop {
             paymentMethod,
             trackingCode: this.generateTrackingCode(),
             estimatedDelivery: this.calculateEstimatedDelivery(),
-            updates: []
+            updates: [],
+            adminRead: false // NOUVEAU: marqué comme non lu par l'admin
         };
 
         // Update stock
@@ -364,7 +365,7 @@ class LamitiShop {
         // Send confirmation email simulation
         this.sendOrderConfirmation(order);
 
-        // Trigger admin notification - IMPORTANT: Cela déclenchera le son
+        // Trigger admin notification avec son continu
         this.triggerAdminNotification(order);
 
         // Store customer order reference
@@ -524,7 +525,7 @@ class LamitiShop {
         return labels[status] || status;
     }
 
-    // Trigger admin notification for new order - C'EST ICI QUE LE SON EST DÉCLENCHÉ
+    // Trigger admin notification for new order avec son continu
     triggerAdminNotification(order) {
         // Dispatch event for admin page
         const event = new CustomEvent('newOrderCreated', {
@@ -532,16 +533,10 @@ class LamitiShop {
         });
         document.dispatchEvent(event);
         
-        // Also save to a special storage for admin to check
-        const pendingOrders = JSON.parse(localStorage.getItem('lamiti-pending-admin-notifications') || '[]');
-        pendingOrders.push({
-            orderId: order.id,
-            customer: order.customer,
-            total: order.total,
-            timestamp: new Date().toISOString(),
-            notified: false
-        });
-        localStorage.setItem('lamiti-pending-admin-notifications', JSON.stringify(pendingOrders));
+        // Si l'admin est connecté, déclencher le son immédiatement
+        if (window.adminManager && window.adminManager.isAdmin) {
+            // Le son sera déclenché via l'event listener dans adminManager
+        }
     }
 
     // Admin Functions
@@ -647,7 +642,7 @@ class LamitiShop {
         
         document.body.appendChild(notification);
         
-        // Jouer le son pour les notifications importantes (sur les autres pages)
+        // Jouer le son pour les notifications importantes
         if (type === 'success' || type === 'info') {
             this.playNotificationSound();
         }
@@ -672,12 +667,23 @@ class LamitiShop {
 
     // Fonction pour jouer le son de notification
     playNotificationSound() {
-        // Pour les autres pages (non-admin), créer un élément audio temporaire
-        const audio = new Audio('https://www.soundjay.com/buttons/beep-02.mp3');
-        audio.volume = 0.5;
-        audio.play().catch(e => {
-            console.log('Audio playback failed:', e);
-        });
+        // Vérifier si nous sommes dans l'admin
+        if (document.getElementById('notification-sound')) {
+            const sound = document.getElementById('notification-sound');
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play().catch(e => {
+                    console.log('Audio playback failed:', e);
+                });
+            }
+        } else {
+            // Pour les autres pages, créer un élément audio temporaire
+            const audio = new Audio('resources/natifmp3.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(e => {
+                console.log('Audio playback failed:', e);
+            });
+        }
     }
 
     animateAddToCart() {
