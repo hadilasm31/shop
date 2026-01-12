@@ -1,517 +1,934 @@
-// LAMITI SHOP - Main JavaScript
-class LamitiShop {
+// Admin functionality for LAMITI SHOP
+class AdminManager {
     constructor() {
-        this.products = [];
-        this.cart = JSON.parse(localStorage.getItem('lamiti-cart')) || [];
-        this.orders = JSON.parse(localStorage.getItem('lamiti-orders')) || [];
-        this.currentUser = JSON.parse(localStorage.getItem('lamiti-user')) || null;
         this.isAdmin = false;
-        
-        // Load categories from localStorage or use defaults
-        const savedCategories = localStorage.getItem('lamiti-categories');
-        const savedSubcategories = localStorage.getItem('lamiti-subcategories');
-        const savedCategoryImages = localStorage.getItem('lamiti-category-images');
-        
-        this.categories = savedCategories ? JSON.parse(savedCategories) : ['femmes', 'hommes', 'accessoires'];
-        this.subcategories = savedSubcategories ? JSON.parse(savedSubcategories) : {
-            'femmes': ['robes', 'vestes', 'pantalons', 'chaussures'],
-            'hommes': ['chemises', 'pantalons', 'vestes', 'chaussures'],
-            'accessoires': ['sacs', 'montres', 'lunettes', 'bijoux']
-        };
-        
-        this.categoryImages = savedCategoryImages ? JSON.parse(savedCategoryImages) : {};
-        
+        this.unreadNotifications = [];
+        this.notificationSound = null;
+        this.notificationSoundInterval = null;
         this.init();
     }
 
     init() {
-        this.loadProducts();
-        this.initializeAnimations();
         this.bindEvents();
-        this.updateCartBadge();
-        this.initializeAdmin();
-        this.initializeRealTimeUpdates();
-        this.optimizeForMobile();
+        this.checkAdminSession();
+        this.loadNotificationSound();
+        this.injectNotificationStyles();
+    }
+
+    injectNotificationStyles() {
+        // Vérifier si les styles sont déjà injectés
+        if (document.getElementById('notification-styles')) return;
         
-        // Initialize order tracking
-        this.initializeOrderTracking();
-    }
-
-    // Product Management
-    loadProducts() {
-        const defaultProducts = [
-            {
-                id: 'prod1',
-                name: 'Sac en Cuir Noir',
-                category: 'accessoires',
-                subcategory: 'sacs',
-                price: 129000,
-                originalPrice: 159000,
-                images: ['https://images.unsplash.com/photo-1553062407-98eeb64c6a62?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'],
-                description: 'Sac en cuir véritable avec finitions impeccables. Parfait pour un usage quotidien.',
-                sizes: ['Unique'],
-                colors: ['Noir', 'Marron'],
-                stock: 15,
-                featured: true,
-                onSale: true,
-                active: true,
-                addedAt: new Date('2024-01-15').toISOString()
-            },
-            {
-                id: 'prod2',
-                name: 'Blazer Femme Élégant',
-                category: 'femmes',
-                subcategory: 'vestes',
-                price: 89000,
-                originalPrice: 89000,
-                images: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'],
-                description: 'Blazer tailleur parfait pour le bureau ou les occasions spéciales.',
-                sizes: ['XS', 'S', 'M', 'L', 'XL'],
-                colors: ['Beige', 'Noir', 'Gris'],
-                stock: 25,
-                featured: true,
-                onSale: false,
-                active: true,
-                addedAt: new Date('2024-01-20').toISOString()
-            },
-            {
-                id: 'prod3',
-                name: 'Montre de Luxe',
-                category: 'accessoires',
-                subcategory: 'montres',
-                price: 299000,
-                originalPrice: 350000,
-                images: ['https://images.unsplash.com/photo-1523170335258-f5ed11844a49?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'],
-                description: 'Montre suisse avec mouvement automatique et bracelet en cuir.',
-                sizes: ['Unique'],
-                colors: ['Or', 'Argent'],
-                stock: 8,
-                featured: false,
-                onSale: true,
-                active: true,
-                addedAt: new Date('2024-02-01').toISOString()
-            },
-            {
-                id: 'prod4',
-                name: 'Lunettes de Soleil Design',
-                category: 'accessoires',
-                subcategory: 'lunettes',
-                price: 45000,
-                originalPrice: 45000,
-                images: ['https://images.unsplash.com/photo-1572635196237-14b3f281503f?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'],
-                description: 'Lunettes UV400 avec design moderne et protection maximale.',
-                sizes: ['Unique'],
-                colors: ['Noir', 'Marron', 'Or'],
-                stock: 30,
-                featured: false,
-                onSale: false,
-                active: true,
-                addedAt: new Date('2024-02-10').toISOString()
-            },
-            {
-                id: 'prod5',
-                name: 'Robe Soirée Élégante',
-                category: 'femmes',
-                subcategory: 'robes',
-                price: 185000,
-                originalPrice: 220000,
-                images: ['https://images.unsplash.com/photo-1595777457583-95e059d581b8?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'],
-                description: 'Robe de soirée en soie avec détails raffinés.',
-                sizes: ['XS', 'S', 'M', 'L'],
-                colors: ['Noir', 'Rouge', 'Bleu'],
-                stock: 12,
-                featured: true,
-                onSale: true,
-                active: true,
-                addedAt: new Date('2024-02-15').toISOString()
-            },
-            {
-                id: 'prod6',
-                name: 'Chemise Homme Classique',
-                category: 'hommes',
-                subcategory: 'chemises',
-                price: 65000,
-                originalPrice: 65000,
-                images: ['https://images.unsplash.com/photo-1596755094514-f87e34085b2c?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80'],
-                description: 'Chemise en coton premium avec coupe ajustée.',
-                sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-                colors: ['Blanc', 'Bleu', 'Gris'],
-                stock: 20,
-                featured: false,
-                onSale: false,
-                active: true,
-                addedAt: new Date('2024-02-20').toISOString()
-            }
-        ];
-
-        const savedProducts = localStorage.getItem('lamiti-products');
-        this.products = savedProducts ? JSON.parse(savedProducts) : defaultProducts;
-        
-        if (!savedProducts) {
-            localStorage.setItem('lamiti-products', JSON.stringify(this.products));
-        }
-    }
-
-    saveProducts() {
-        localStorage.setItem('lamiti-products', JSON.stringify(this.products));
-        this.notifyDataChange();
-    }
-
-    saveOrders() {
-        localStorage.setItem('lamiti-orders', JSON.stringify(this.orders));
-        this.notifyDataChange();
-    }
-
-    // Category Management
-    addCategory(categoryName, subcategories = [], image = null) {
-        const normalizedName = categoryName.trim().toLowerCase();
-        
-        if (!this.categories.includes(normalizedName)) {
-            this.categories.push(normalizedName);
-            this.subcategories[normalizedName] = subcategories;
-            
-            // Save category image if provided
-            if (image) {
-                this.categoryImages[normalizedName] = image;
-                this.saveCategoryImages();
+        const style = document.createElement('style');
+        style.id = 'notification-styles';
+        style.textContent = `
+            /* Styles spécifiques pour le panneau de notifications - IMPORTANT !important */
+            .notification-panel .notification-section-title {
+                padding: 8px 15px;
+                background: #f8f9fa;
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: #666;
+                border-bottom: 1px solid #eee;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
             }
             
-            this.saveCategories();
-            this.showNotification(`Catégorie "${categoryName}" ajoutée avec succès!`, 'success');
-            return true;
-        }
-        this.showNotification('Cette catégorie existe déjà!', 'error');
-        return false;
-    }
-
-    deleteCategory(categoryName) {
-        if (this.categories.includes(categoryName)) {
-            // Check if category has products
-            const hasProducts = this.products.some(p => p.category === categoryName);
-            if (hasProducts) {
-                this.showNotification('Impossible de supprimer: cette catégorie contient des produits!', 'error');
-                return false;
+            .notification-panel .notification-section-title.unread-section {
+                background: #fff3cd !important;
+                color: #856404 !important;
+                border-bottom: 1px solid #ffeaa7 !important;
+                font-weight: 700;
             }
             
-            this.categories = this.categories.filter(c => c !== categoryName);
-            delete this.subcategories[categoryName];
-            
-            // Remove category image
-            if (this.categoryImages[categoryName]) {
-                delete this.categoryImages[categoryName];
-                this.saveCategoryImages();
+            .notification-panel .notification-count-badge {
+                background: #e74c3c;
+                color: white;
+                font-size: 0.75rem;
+                padding: 2px 8px;
+                border-radius: 10px;
             }
             
-            this.saveCategories();
-            this.showNotification(`Catégorie "${categoryName}" supprimée avec succès!`, 'info');
-            return true;
-        }
-        return false;
-    }
-
-    saveCategories() {
-        localStorage.setItem('lamiti-categories', JSON.stringify(this.categories));
-        localStorage.setItem('lamiti-subcategories', JSON.stringify(this.subcategories));
-        this.notifyDataChange();
-    }
-
-    saveCategoryImages() {
-        localStorage.setItem('lamiti-category-images', JSON.stringify(this.categoryImages));
-        this.notifyDataChange();
-    }
-
-    // Cart Management
-    addToCart(productId, quantity = 1, size = null, color = null) {
-        const product = this.products.find(p => p.id === productId);
-        if (!product || product.stock < quantity) {
-            this.showNotification('Stock insuffisant!', 'error');
-            return false;
-        }
-
-        // Check if item already exists in cart
-        const existingItem = this.cart.find(item => 
-            item.productId === productId && 
-            item.size === size && 
-            item.color === color
-        );
-
-        if (existingItem) {
-            if (product.stock < existingItem.quantity + quantity) {
-                this.showNotification('Stock insuffisant!', 'error');
-                return false;
+            /* Fond jaune pour notifications non lues dans le panneau */
+            .notification-panel .notification-item.unread-notification {
+                background-color: #fff3cd !important;
+                border-left: 3px solid #ffc107 !important;
+                position: relative;
             }
-            existingItem.quantity += quantity;
-        } else {
-            this.cart.push({
-                productId,
-                quantity,
-                size,
-                color,
-                addedAt: new Date().toISOString()
+            
+            .notification-panel .notification-item.unread-notification:hover {
+                background-color: #ffeaa7 !important;
+            }
+            
+            .notification-panel .notification-item.unread-notification .notification-item-title {
+                color: #856404 !important;
+                font-weight: 700;
+            }
+            
+            .notification-panel .notification-item.unread-notification .notification-item-title span:first-child {
+                color: #856404 !important;
+            }
+            
+            .notification-panel .notification-item.unread-notification .notification-item-message {
+                color: #856404 !important;
+            }
+            
+            .notification-panel .notification-bell-icon {
+                color: #ffc107;
+                margin-right: 5px;
+                animation: bellSwing 1s ease-in-out infinite;
+            }
+            
+            @keyframes bellSwing {
+                0%, 100% { transform: rotate(0deg); }
+                25% { transform: rotate(-10deg); }
+                75% { transform: rotate(10deg); }
+            }
+            
+            /* Styles de base pour les éléments de notification */
+            .notification-panel .notification-item {
+                padding: 12px 15px;
+                border-bottom: 1px solid #eee;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                position: relative;
+                background-color: white;
+            }
+            
+            .notification-panel .notification-item:hover {
+                background-color: #f8f9fa;
+            }
+            
+            .notification-panel .notification-item-title {
+                font-weight: 600;
+                margin-bottom: 5px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .notification-panel .notification-item-time {
+                font-size: 0.7rem;
+                color: #999;
+                white-space: nowrap;
+            }
+            
+            .notification-panel .notification-item-message {
+                font-size: 0.85rem;
+                color: #666;
+                margin-bottom: 5px;
+                line-height: 1.4;
+            }
+            
+            .notification-panel .notification-item-order {
+                font-size: 0.8rem;
+                color: #3498db;
+                cursor: pointer;
+                text-decoration: underline;
+                display: inline-block;
+            }
+            
+            /* Animation pour notifications non lues */
+            @keyframes highlightPulse {
+                0% { background-color: #fff3cd; }
+                50% { background-color: #fff8e1; }
+                100% { background-color: #fff3cd; }
+            }
+            
+            .notification-panel .notification-item.unread-notification {
+                animation: highlightPulse 2s ease-in-out infinite;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    bindEvents() {
+        // Login form submission
+        const loginForm = document.getElementById('admin-login-form');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleAdminLogin();
             });
         }
 
-        this.saveCart();
-        this.updateCartBadge();
-        this.showNotification('Article ajouté au panier!', 'success');
-        this.animateAddToCart();
-        
-        // Close any open modals
-        this.closeAllModals();
-        return true;
-    }
-
-    removeFromCart(productId, size = null, color = null) {
-        this.cart = this.cart.filter(item => 
-            !(item.productId === productId && 
-              item.size === size && 
-              item.color === color)
-        );
-        this.saveCart();
-        this.updateCartBadge();
-        this.showNotification('Article retiré du panier', 'info');
-    }
-
-    updateCartQuantity(productId, quantity, size = null, color = null) {
-        const item = this.cart.find(item => 
-            item.productId === productId && 
-            item.size === size && 
-            item.color === color
-        );
-        
-        if (item) {
-            const product = this.products.find(p => p.id === productId);
-            if (product && product.stock >= quantity) {
-                item.quantity = quantity;
-                this.saveCart();
-                this.updateCartBadge();
-                this.updateCartDisplay();
-            } else {
-                this.showNotification('Stock insuffisant!', 'error');
-            }
-        }
-    }
-
-    saveCart() {
-        localStorage.setItem('lamiti-cart', JSON.stringify(this.cart));
-    }
-
-    updateCartBadge() {
-        const badges = document.querySelectorAll('.cart-badge');
-        const totalItems = this.cart.reduce((sum, item) => sum + item.quantity, 0);
-        
-        badges.forEach(badge => {
-            badge.textContent = totalItems;
-            badge.style.display = totalItems > 0 ? 'flex' : 'none';
-        });
-    }
-
-    updateCartDisplay() {
-        // Update cart page if user is on it
-        if (window.location.pathname.includes('cart.html')) {
-            if (typeof loadCartPage === 'function') {
-                loadCartPage();
-            }
-        }
-    }
-
-    // Order Management - MODIFIÉ avec adminRead
-    createOrder(customerInfo, shippingAddress, paymentMethod) {
-        if (this.cart.length === 0) {
-            this.showNotification('Votre panier est vide!', 'error');
-            return null;
+        // Login button click
+        const loginBtn = document.querySelector('.login-btn');
+        if (loginBtn) {
+            loginBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.handleAdminLogin();
+            });
         }
 
-        const orderId = 'ORD-' + Date.now();
-        const order = {
-            id: orderId,
-            customer: customerInfo,
-            items: [...this.cart],
-            total: this.calculateTotal(),
-            status: 'pending',
-            statusHistory: [
-                {
-                    status: 'pending',
-                    timestamp: new Date().toISOString(),
-                    note: 'Commande créée'
+        // Enter key in login form
+        const usernameInput = document.getElementById('admin-username');
+        const passwordInput = document.getElementById('admin-password');
+        
+        if (usernameInput && passwordInput) {
+            usernameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleAdminLogin();
                 }
-            ],
-            orderDate: new Date().toISOString(),
-            shippingAddress,
-            paymentMethod,
-            trackingCode: this.generateTrackingCode(),
-            estimatedDelivery: this.calculateEstimatedDelivery(),
-            updates: [],
-            adminRead: false // NOUVEAU: marqué comme non lu par l'admin
-        };
-
-        // Update stock
-        this.cart.forEach(item => {
-            const product = this.products.find(p => p.id === item.productId);
-            if (product) {
-                product.stock -= item.quantity;
+            });
+            
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleAdminLogin();
+                }
+            });
+        }
+        
+        // Listen for new orders
+        document.addEventListener('newOrderCreated', (e) => {
+            this.handleNewOrderNotification(e.detail.order);
+        });
+        
+        // Listen for data updates
+        document.addEventListener('shopDataUpdate', () => {
+            if (this.isAdmin) {
+                this.loadDashboardStats();
+                this.updateCategoriesChart();
+                this.loadCustomerStats();
             }
         });
-
-        this.orders.push(order);
-        this.saveOrders();
-        this.saveProducts();
-        
-        // Clear cart
-        this.cart = [];
-        this.saveCart();
-        this.updateCartBadge();
-
-        // Send confirmation email simulation
-        this.sendOrderConfirmation(order);
-
-        // Trigger admin notification avec son continu
-        this.triggerAdminNotification(order);
-
-        // Store customer order reference
-        this.storeCustomerOrder(order.customer.email, orderId);
-
-        return order;
     }
 
-    storeCustomerOrder(email, orderId) {
-        let customerOrders = JSON.parse(localStorage.getItem('lamiti-customer-orders') || '{}');
-        if (!customerOrders[email]) {
-            customerOrders[email] = [];
+    loadNotificationSound() {
+        // Create notification sound element if it doesn't exist
+        if (!document.getElementById('new-order-notification-sound')) {
+            const audio = document.createElement('audio');
+            audio.id = 'new-order-notification-sound';
+            audio.preload = 'auto';
+            audio.loop = true;
+            audio.volume = 0.5;
+            
+            const source = document.createElement('source');
+            source.src = 'https://www.soundjay.com/buttons/button-2.mp3';
+            source.type = 'audio/mpeg';
+            
+            audio.appendChild(source);
+            document.body.appendChild(audio);
         }
-        if (!customerOrders[email].includes(orderId)) {
-            customerOrders[email].push(orderId);
-            localStorage.setItem('lamiti-customer-orders', JSON.stringify(customerOrders));
+        
+        this.notificationSound = document.getElementById('new-order-notification-sound');
+        
+        // Précharger le son
+        if (this.notificationSound) {
+            this.notificationSound.load();
         }
     }
 
-    generateTrackingCode() {
-        return 'TRK-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-    }
-
-    calculateEstimatedDelivery() {
-        const deliveryDate = new Date();
-        deliveryDate.setDate(deliveryDate.getDate() + 3); // 3 days delivery
-        return deliveryDate.toISOString();
-    }
-
-    calculateTotal() {
-        return this.cart.reduce((total, item) => {
-            const product = this.products.find(p => p.id === item.productId);
-            return total + (product ? product.price * item.quantity : 0);
-        }, 0);
-    }
-
-    // Updated order status management
-    updateOrderStatus(orderId, newStatus, note = null) {
-        const order = this.orders.find(o => o.id === orderId);
-        if (order) {
-            const oldStatus = order.status;
-            order.status = newStatus;
-            
-            // Add to status history
-            if (!order.statusHistory) {
-                order.statusHistory = [];
-            }
-            
-            order.statusHistory.push({
-                status: newStatus,
-                timestamp: new Date().toISOString(),
-                note: note || `Statut changé de "${this.getStatusLabel(oldStatus)}" à "${this.getStatusLabel(newStatus)}"`
-            });
-            
-            order.lastUpdate = new Date().toISOString();
-            this.saveOrders();
-            
-            // Add to updates for real-time notification
-            order.updates = order.updates || [];
-            order.updates.push({
-                type: 'status_change',
-                oldStatus: oldStatus,
-                newStatus: newStatus,
-                timestamp: new Date().toISOString(),
-                message: note || `Votre commande est maintenant "${this.getStatusLabel(newStatus)}"`
-            });
-            
-            // Notify customer
-            this.sendStatusUpdateNotification(order);
-            
-            return true;
-        }
-        return false;
-    }
-
-    getOrderByTrackingCode(trackingCode) {
-        return this.orders.find(o => o.trackingCode === trackingCode);
-    }
-
-    getCustomerOrders(email) {
-        const customerOrders = JSON.parse(localStorage.getItem('lamiti-customer-orders') || '{}');
-        const orderIds = customerOrders[email] || [];
-        
-        return this.orders.filter(order => orderIds.includes(order.id));
-    }
-
-    // Order tracking system
-    initializeOrderTracking() {
-        // Check for order updates every 5 seconds
-        setInterval(() => {
-            this.checkOrderUpdates();
-        }, 5000);
-    }
-
-    checkOrderUpdates() {
-        const currentUserEmail = this.currentUser?.email;
-        if (!currentUserEmail) return;
-        
-        const customerOrders = this.getCustomerOrders(currentUserEmail);
-        
-        customerOrders.forEach(order => {
-            // Check if there are new updates
-            if (order.updates && order.updates.length > 0) {
-                const lastSeenUpdate = localStorage.getItem(`lamiti-last-update-${order.id}`) || 0;
-                const newUpdates = order.updates.filter(update => 
-                    new Date(update.timestamp).getTime() > lastSeenUpdate
-                );
+    checkAdminSession() {
+        const adminSession = localStorage.getItem('lamiti-admin');
+        if (adminSession) {
+            try {
+                const session = JSON.parse(adminSession);
+                const now = new Date();
+                const loginTime = new Date(session.loginTime);
+                const sessionDuration = now - loginTime;
                 
-                if (newUpdates.length > 0) {
-                    // Show notification for new updates
-                    newUpdates.forEach(update => {
-                        if (update.type === 'status_change') {
-                            this.showNotification(
-                                `Mise à jour commande ${order.id}: ${update.message}`,
-                                'info'
-                            );
-                        }
-                    });
-                    
-                    // Update last seen
-                    const latestUpdate = order.updates[order.updates.length - 1];
-                    localStorage.setItem(`lamiti-last-update-${order.id}`, 
-                        new Date(latestUpdate.timestamp).getTime());
+                // Check if session is still valid (1 hour)
+                if (sessionDuration < 3600000) {
+                    this.isAdmin = true;
+                    this.showAdminDashboard();
+                    this.loadAdminContent();
+                } else {
+                    // Session expired
+                    localStorage.removeItem('lamiti-admin');
                 }
+            } catch (error) {
+                console.error('Invalid admin session:', error);
+                localStorage.removeItem('lamiti-admin');
+            }
+        }
+    }
+
+    handleAdminLogin() {
+        const username = document.getElementById('admin-username').value.trim();
+        const password = document.getElementById('admin-password').value.trim();
+
+        // Simple admin authentication (demo)
+        if (username === 'admin' && password === 'lamiti2024') {
+            this.isAdmin = true;
+            
+            // Save admin session
+            localStorage.setItem('lamiti-admin', JSON.stringify({
+                username,
+                loginTime: new Date().toISOString()
+            }));
+            
+            this.showAdminDashboard();
+            this.showNotification('Connexion admin réussie!', 'success');
+            this.loadAdminContent();
+            
+            // Stop notification sound when admin logs in
+            this.stopNotificationSound();
+        } else {
+            this.showNotification('Identifiants incorrects!', 'error');
+            
+            // Add shake animation to form
+            const loginContainer = document.querySelector('.login-container');
+            if (loginContainer) {
+                loginContainer.style.animation = 'shake 0.5s ease-in-out';
+                setTimeout(() => {
+                    loginContainer.style.animation = '';
+                }, 500);
+            }
+        }
+    }
+
+    showAdminDashboard() {
+        const loginSection = document.getElementById('admin-login');
+        const dashboardSection = document.getElementById('admin-dashboard');
+        
+        if (loginSection && dashboardSection) {
+            loginSection.style.display = 'none';
+            dashboardSection.style.display = 'block';
+        }
+    }
+
+    loadAdminContent() {
+        // Load dashboard stats
+        this.loadDashboardStats();
+        
+        // Initialize charts
+        this.initializeCharts();
+        
+        // Load products
+        this.loadAdminProducts();
+        this.loadMobileProducts();
+        
+        // Load categories
+        this.loadAdminCategories();
+        
+        // Load orders
+        this.loadAdminOrders();
+        this.loadMobileOrders();
+        
+        // Load customers
+        this.loadAdminCustomers();
+        this.loadMobileCustomers();
+        
+        // Load customer stats
+        this.loadCustomerStats();
+        
+        // Load low stock
+        this.loadLowStockProducts();
+        this.loadMobileLowStock();
+        
+        // Check for unread notifications
+        this.checkForUnreadNotifications();
+        
+        // Update notification panel
+        this.updateNotificationPanel();
+    }
+
+    loadDashboardStats() {
+        if (!window.shop) return;
+        
+        const totalProducts = window.shop.products.length;
+        const totalOrders = window.shop.orders.length;
+        const totalRevenue = window.shop.orders.reduce((sum, order) => sum + order.total, 0);
+        const lowStockItems = window.shop.products.filter(p => p.stock < 5).length;
+        const pendingOrders = window.shop.orders.filter(o => o.status === 'pending').length;
+        const completedOrders = window.shop.orders.filter(o => o.status === 'delivered').length;
+        
+        const elements = {
+            'total-products': totalProducts,
+            'total-orders': totalOrders,
+            'total-revenue': window.shop.formatPrice(totalRevenue),
+            'low-stock-items': lowStockItems,
+            'pending-orders': pendingOrders,
+            'completed-orders': completedOrders
+        };
+
+        Object.entries(elements).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
             }
         });
     }
 
-    getOrderStatusTimeline(orderId) {
-        const order = this.orders.find(o => o.id === orderId);
-        if (!order || !order.statusHistory) return [];
+    loadCustomerStats() {
+        if (!window.shop) return;
         
-        return order.statusHistory.sort((a, b) => 
-            new Date(a.timestamp) - new Date(b.timestamp)
-        );
+        const customers = this.getUniqueCustomers();
+        const totalCustomers = customers.length;
+        
+        // Calculate active customers (ordered in last 30 days)
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const activeCustomers = customers.filter(customer => {
+            const latestOrder = Math.max(...customer.orders.map(o => new Date(o.orderDate).getTime()));
+            return latestOrder > thirtyDaysAgo.getTime();
+        }).length;
+        
+        // Calculate average order value
+        const totalRevenue = window.shop.orders.reduce((sum, order) => sum + order.total, 0);
+        const avgOrderValue = window.shop.orders.length > 0 ? totalRevenue / window.shop.orders.length : 0;
+        
+        // Calculate repeat customer rate
+        const repeatCustomers = customers.filter(c => c.orders.length > 1).length;
+        const repeatCustomerRate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
+        
+        // Update UI
+        const totalCustomersEl = document.getElementById('total-customers');
+        const activeCustomersEl = document.getElementById('active-customers');
+        const avgOrderValueEl = document.getElementById('avg-order-value');
+        const repeatCustomersEl = document.getElementById('repeat-customers');
+        
+        if (totalCustomersEl) totalCustomersEl.textContent = totalCustomers;
+        if (activeCustomersEl) activeCustomersEl.textContent = activeCustomers;
+        if (avgOrderValueEl) avgOrderValueEl.textContent = window.shop.formatPrice(avgOrderValue);
+        if (repeatCustomersEl) repeatCustomersEl.textContent = repeatCustomerRate + '%';
     }
 
-    getNextStatus(currentStatus) {
-        const statusFlow = {
-            'pending': 'confirmed',
-            'confirmed': 'shipped',
-            'shipped': 'delivered',
-            'delivered': null,
-            'cancelled': null
+    getUniqueCustomers() {
+        if (!window.shop) return [];
+        
+        const customers = {};
+        window.shop.orders.forEach(order => {
+            const email = order.customer.email;
+            if (!customers[email]) {
+                customers[email] = {
+                    ...order.customer,
+                    orders: [],
+                    totalSpent: 0
+                };
+            }
+            customers[email].orders.push(order);
+            customers[email].totalSpent += order.total;
+        });
+        
+        return Object.values(customers);
+    }
+
+    initializeCharts() {
+        // Initialize charts if ECharts is available
+        if (typeof echarts !== 'undefined') {
+            this.updateSalesChart();
+            this.updateCategoriesChart();
+        }
+    }
+
+    updateSalesChart() {
+        const salesChartEl = document.getElementById('sales-chart');
+        if (!salesChartEl) return;
+        
+        const salesChart = echarts.init(salesChartEl);
+        const salesOption = {
+            title: {
+                text: 'Ventes des 6 derniers mois',
+                left: 'center',
+                textStyle: {
+                    fontSize: 14
+                }
+            },
+            tooltip: {
+                trigger: 'axis'
+            },
+            xAxis: {
+                type: 'category',
+                data: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'],
+                axisLabel: {
+                    fontSize: window.innerWidth <= 768 ? 10 : 12
+                }
+            },
+            yAxis: {
+                type: 'value',
+                axisLabel: {
+                    formatter: '{value} FCFA',
+                    fontSize: window.innerWidth <= 768 ? 10 : 12
+                }
+            },
+            series: [{
+                data: [120000, 200000, 150000, 80000, 70000, 110000],
+                type: 'line',
+                smooth: true,
+                itemStyle: {
+                    color: '#d4af37'
+                },
+                areaStyle: {
+                    color: 'rgba(212, 175, 55, 0.3)'
+                }
+            }],
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            }
         };
-        return statusFlow[currentStatus];
+        salesChart.setOption(salesOption);
+        
+        // Handle resize
+        window.addEventListener('resize', function() {
+            salesChart.resize();
+        });
+    }
+
+    updateCategoriesChart() {
+        const categoriesChartEl = document.getElementById('categories-chart');
+        if (!categoriesChartEl || !window.shop) return;
+        
+        const categoriesChart = echarts.init(categoriesChartEl);
+        const categoryStats = window.shop.getCategoryStats();
+        const chartData = Object.entries(categoryStats).map(([name, value]) => ({
+            value: value,
+            name: name.charAt(0).toUpperCase() + name.slice(1)
+        }));
+
+        const categoriesOption = {
+            title: {
+                text: 'Répartition par catégorie',
+                left: 'center',
+                textStyle: {
+                    fontSize: 14
+                }
+            },
+            tooltip: {
+                trigger: 'item'
+            },
+            series: [{
+                type: 'pie',
+                radius: window.innerWidth <= 768 ? '45%' : '50%',
+                data: chartData,
+                emphasis: {
+                    itemStyle: {
+                        shadowBlur: 10,
+                        shadowOffsetX: 0,
+                        shadowColor: 'rgba(0, 0, 0, 0.5)'
+                    }
+                },
+                label: {
+                    fontSize: window.innerWidth <= 768 ? 10 : 12
+                }
+            }],
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                containLabel: true
+            }
+        };
+        categoriesChart.setOption(categoriesOption);
+        
+        // Handle resize
+        window.addEventListener('resize', function() {
+            categoriesChart.resize();
+        });
+    }
+
+    // PRODUCTS TABLE - DESKTOP VERSION
+    loadAdminProducts() {
+        if (!window.shop) return;
+        
+        const productsTable = document.getElementById('products-table-body');
+        if (!productsTable) return;
+
+        const products = window.shop.products;
+        
+        let html = '';
+        
+        products.forEach(product => {
+            const stockClass = product.stock < 5 ? 'text-red-600 font-semibold' : '';
+            const statusClass = product.active ? 'status-confirmed' : 'status-cancelled';
+            const statusText = product.active ? 'Actif' : 'Inactif';
+            const toggleIcon = product.active ? '✅' : '⏸️';
+            const saleStatus = product.onSale ? 'Oui' : 'Non';
+            
+            html += `
+                <tr data-product-id="${product.id}">
+                    <td>
+                        <div class="table-image">
+                            <img src="${product.images[0] || 'resources/product-placeholder.jpg'}" alt="${product.name}">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="font-semibold" style="font-size: 0.9rem;">${product.name}</div>
+                        <div class="text-sm text-gray-600">
+                            ${product.description.substring(0, 50)}...
+                        </div>
+                    </td>
+                    <td class="capitalize">${product.category}</td>
+                    <td class="font-semibold">${window.shop.formatPrice(product.price)}</td>
+                    <td class="${stockClass}">${product.stock}</td>
+                    <td>${saleStatus}</td>
+                    <td>
+                        <span class="order-status ${statusClass}">${statusText}</span>
+                    </td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="action-btn edit-btn" onclick="editProduct('${product.id}')" title="Modifier">✏️</button>
+                            <button class="action-btn toggle-btn ${product.active ? 'active' : ''}" onclick="toggleProduct('${product.id}')" title="${product.active ? 'Désactiver' : 'Activer'}">
+                                ${toggleIcon}
+                            </button>
+                            <button class="action-btn delete-btn" onclick="deleteProduct('${product.id}')" title="Supprimer">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        productsTable.innerHTML = html;
+    }
+
+    // PRODUCTS MOBILE VERSION
+    loadMobileProducts() {
+        if (!window.shop || window.innerWidth > 768) return;
+        
+        const mobileContainer = document.getElementById('products-mobile-view');
+        if (!mobileContainer) return;
+
+        const products = window.shop.products;
+        
+        let html = '';
+        
+        products.forEach(product => {
+            const stockClass = product.stock < 5 ? 'text-red-600 font-semibold' : '';
+            const statusClass = product.active ? 'status-confirmed' : 'status-cancelled';
+            const statusText = product.active ? 'Actif' : 'Inactif';
+            const saleStatus = product.onSale ? 'Oui' : 'Non';
+            
+            html += `
+                <div class="mobile-table-card" data-product-id="${product.id}">
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Image</div>
+                        <div class="mobile-table-value">
+                            <div class="table-image" style="margin: 0 auto;">
+                                <img src="${product.images[0] || 'resources/product-placeholder.jpg'}" alt="${product.name}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Nom</div>
+                        <div class="mobile-table-value">
+                            <div class="font-semibold">${product.name}</div>
+                            <div class="text-sm text-gray-600">${product.description.substring(0, 40)}...</div>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Catégorie</div>
+                        <div class="mobile-table-value capitalize">${product.category}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Prix</div>
+                        <div class="mobile-table-value font-semibold">${window.shop.formatPrice(product.price)}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Stock</div>
+                        <div class="mobile-table-value ${stockClass}">${product.stock}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">En solde</div>
+                        <div class="mobile-table-value">${saleStatus}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Statut</div>
+                        <div class="mobile-table-value">
+                            <span class="order-status ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Actions</div>
+                        <div class="mobile-table-value">
+                            <div class="table-actions">
+                                <button class="action-btn edit-btn" onclick="editProduct('${product.id}')" title="Modifier">✏️</button>
+                                <button class="action-btn toggle-btn ${product.active ? 'active' : ''}" onclick="toggleProduct('${product.id}')" title="${product.active ? 'Désactiver' : 'Activer'}">
+                                    ${product.active ? '✅' : '⏸️'}
+                                </button>
+                                <button class="action-btn delete-btn" onclick="deleteProduct('${product.id}')" title="Supprimer">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        mobileContainer.innerHTML = html;
+    }
+
+    loadAdminCategories() {
+        if (!window.shop) return;
+        
+        const categoriesGrid = document.getElementById('categories-grid');
+        if (!categoriesGrid) return;
+
+        let html = '';
+        
+        window.shop.categories.forEach(category => {
+            const subcategories = window.shop.subcategories[category] || [];
+            const productCount = window.shop.products.filter(p => p.category === category).length;
+            const categoryImage = window.shop.categoryImages ? window.shop.categoryImages[category] : null;
+            
+            html += `
+                <div class="category-card">
+                    <div class="category-header">
+                        <div class="category-name capitalize">${category}</div>
+                        <div class="category-actions">
+                            <button class="action-btn edit-btn" onclick="editCategory('${category}')">✏️</button>
+                            <button class="action-btn delete-btn" onclick="deleteCategory('${category}')">🗑️</button>
+                        </div>
+                    </div>
+                    <div class="category-image">
+                        <img src="${categoryImage || 'resources/category-placeholder.jpg'}" alt="${category}">
+                        <div class="category-image-actions">
+                            <button class="action-btn edit-btn" onclick="changeCategoryImage('${category}')">📷</button>
+                        </div>
+                    </div>
+                    <div class="subcategories">
+                        <div class="text-sm text-gray-600 mb-2">Sous-catégories:</div>
+                        <div class="subcategory-list" id="subcategory-list-${category}">
+                            ${subcategories.map(sub => `
+                                <span class="subcategory-tag">
+                                    ${sub}
+                                    <button class="remove-subcategory" onclick="removeSubcategory('${category}', '${sub}')">&times;</button>
+                                </span>
+                            `).join('')}
+                        </div>
+                        <div class="add-subcategory-form">
+                            <input type="text" class="add-subcategory-input" id="subcategory-input-${category}" placeholder="Nouvelle sous-catégorie">
+                            <button class="add-subcategory-btn" onclick="addSubcategory('${category}')">+</button>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-sm text-gray-600">
+                        ${productCount} produit(s) dans cette catégorie
+                    </div>
+                </div>
+            `;
+        });
+        
+        categoriesGrid.innerHTML = html;
+    }
+
+    // ORDERS TABLE - DESKTOP VERSION
+    loadAdminOrders() {
+        if (!window.shop) return;
+        
+        const ordersTable = document.getElementById('orders-table-body');
+        if (!ordersTable) return;
+
+        let html = '';
+        
+        window.shop.orders.forEach(order => {
+            const paymentMethod = order.paymentMethod === 'card' ? 'Carte' : 'Mobile';
+            
+            html += `
+                <tr data-order-id="${order.id}">
+                    <td class="font-mono text-sm">${order.id}</td>
+                    <td>
+                        <div class="font-semibold" style="font-size: 0.9rem;">${order.customer.firstName} ${order.customer.lastName}</div>
+                        <div class="text-sm text-gray-600">${order.customer.email}</div>
+                    </td>
+                    <td class="text-sm">${new Date(order.orderDate).toLocaleDateString('fr-FR')}</td>
+                    <td class="font-semibold">${window.shop.formatPrice(order.total)}</td>
+                    <td>
+                        <span class="order-status status-${order.status}">
+                            ${this.getStatusLabel(order.status)}
+                        </span>
+                    </td>
+                    <td>${paymentMethod}</td>
+                    <td>
+                        <div class="table-actions">
+                            <button class="action-btn edit-btn" onclick="viewOrderDetails('${order.id}')" title="Voir détails">👁️</button>
+                            <button class="action-btn edit-btn" onclick="openUpdateOrderStatusModal('${order.id}')" title="Mettre à jour">🔄</button>
+                            <button class="action-btn delete-btn" onclick="deleteOrder('${order.id}')" title="Supprimer">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        ordersTable.innerHTML = html;
+    }
+
+    // ORDERS MOBILE VERSION
+    loadMobileOrders() {
+        if (!window.shop || window.innerWidth > 768) return;
+        
+        const mobileContainer = document.getElementById('orders-mobile-view');
+        if (!mobileContainer) return;
+
+        let html = '';
+        
+        window.shop.orders.forEach(order => {
+            const paymentMethod = order.paymentMethod === 'card' ? 'Carte' : 'Mobile';
+            
+            html += `
+                <div class="mobile-table-card" data-order-id="${order.id}">
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">ID Commande</div>
+                        <div class="mobile-table-value font-mono text-sm">${order.id}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Client</div>
+                        <div class="mobile-table-value">
+                            <div class="font-semibold">${order.customer.firstName} ${order.customer.lastName}</div>
+                            <div class="text-sm text-gray-600">${order.customer.email}</div>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Date</div>
+                        <div class="mobile-table-value text-sm">${new Date(order.orderDate).toLocaleDateString('fr-FR')}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Total</div>
+                        <div class="mobile-table-value font-semibold">${window.shop.formatPrice(order.total)}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Statut</div>
+                        <div class="mobile-table-value">
+                            <span class="order-status status-${order.status}">
+                                ${this.getStatusLabel(order.status)}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Paiement</div>
+                        <div class="mobile-table-value">${paymentMethod}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Actions</div>
+                        <div class="mobile-table-value">
+                            <div class="table-actions">
+                                <button class="action-btn edit-btn" onclick="viewOrderDetails('${order.id}')" title="Voir détails">👁️</button>
+                                <button class="action-btn edit-btn" onclick="openUpdateOrderStatusModal('${order.id}')" title="Mettre à jour">🔄</button>
+                                <button class="action-btn delete-btn" onclick="deleteOrder('${order.id}')" title="Supprimer">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        mobileContainer.innerHTML = html;
+    }
+
+    // CUSTOMERS TABLE - DESKTOP VERSION
+    loadAdminCustomers() {
+        if (!window.shop) return;
+        
+        const customersTable = document.getElementById('customers-table-body');
+        if (!customersTable) return;
+
+        // Get unique customers
+        const customers = this.getUniqueCustomers();
+        
+        let html = '';
+        
+        customers.forEach(customer => {
+            // Calculate customer level
+            const level = this.getCustomerLevel(customer.totalSpent, customer.orders.length);
+            const loyaltyProgress = Math.min((customer.orders.length / 10) * 100, 100);
+            
+            html += `
+                <tr>
+                    <td>
+                        <div class="font-semibold" style="font-size: 0.9rem;">${customer.firstName} ${customer.lastName}</div>
+                    </td>
+                    <td>${customer.email}</td>
+                    <td>${customer.phone}</td>
+                    <td class="text-center">${customer.orders.length}</td>
+                    <td class="font-semibold">${window.shop.formatPrice(customer.totalSpent)}</td>
+                    <td>
+                        <span class="customer-level level-${level}">${this.getCustomerLevelLabel(level)}</span>
+                    </td>
+                    <td>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${loyaltyProgress}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-600 mt-1">${customer.orders.length}/10 commandes</div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        customersTable.innerHTML = html;
+    }
+
+    // CUSTOMERS MOBILE VERSION
+    loadMobileCustomers() {
+        if (!window.shop || window.innerWidth > 768) return;
+        
+        const mobileContainer = document.getElementById('customers-mobile-view');
+        if (!mobileContainer) return;
+
+        // Get unique customers
+        const customers = this.getUniqueCustomers();
+        
+        let html = '';
+        
+        customers.forEach(customer => {
+            // Calculate customer level
+            const level = this.getCustomerLevel(customer.totalSpent, customer.orders.length);
+            const loyaltyProgress = Math.min((customer.orders.length / 10) * 100, 100);
+            
+            html += `
+                <div class="mobile-table-card">
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Client</div>
+                        <div class="mobile-table-value">
+                            <div class="font-semibold">${customer.firstName} ${customer.lastName}</div>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Email</div>
+                        <div class="mobile-table-value">${customer.email}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Téléphone</div>
+                        <div class="mobile-table-value">${customer.phone}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Commandes</div>
+                        <div class="mobile-table-value text-center">${customer.orders.length}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Total dépensé</div>
+                        <div class="mobile-table-value font-semibold">${window.shop.formatPrice(customer.totalSpent)}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Niveau</div>
+                        <div class="mobile-table-value">
+                            <span class="customer-level level-${level}">${this.getCustomerLevelLabel(level)}</span>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Fidélité</div>
+                        <div class="mobile-table-value">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${loyaltyProgress}%"></div>
+                            </div>
+                            <div class="text-xs text-gray-600 mt-1">${customer.orders.length}/10 commandes</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        mobileContainer.innerHTML = html;
+    }
+
+    getCustomerLevel(totalSpent, orderCount) {
+        if (orderCount >= 10 || totalSpent >= 1000000) return 'vip';
+        if (orderCount >= 5 || totalSpent >= 500000) return 'premium';
+        if (orderCount >= 2 || totalSpent >= 100000) return 'regular';
+        return 'new';
+    }
+
+    getCustomerLevelLabel(level) {
+        const labels = {
+            'new': 'Nouveau',
+            'regular': 'Régulier',
+            'premium': 'Premium',
+            'vip': 'VIP'
+        };
+        return labels[level] || level;
     }
 
     getStatusLabel(status) {
@@ -525,110 +942,225 @@ class LamitiShop {
         return labels[status] || status;
     }
 
-    // Trigger admin notification for new order avec son continu
-    triggerAdminNotification(order) {
-        // Dispatch event for admin page
-        const event = new CustomEvent('newOrderCreated', {
-            detail: { order }
-        });
-        document.dispatchEvent(event);
+    // Handle new order notification with continuous sound
+    handleNewOrderNotification(order) {
+        // Only show notification if admin is logged in
+        if (!this.isAdmin) return;
         
-        // Si l'admin est connecté, déclencher le son immédiatement
-        if (window.adminManager && window.adminManager.isAdmin) {
-            // Le son sera déclenché via l'event listener dans adminManager
-        }
-    }
-
-    // Admin Functions
-    initializeAdmin() {
-        const adminLogin = document.getElementById('admin-login-form');
-        if (adminLogin) {
-            adminLogin.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.handleAdminLogin();
+        // Mark order as unread by admin
+        order.adminRead = false;
+        this.updateOrderReadStatus(order.id, false);
+        
+        // Add to unread notifications
+        this.addUnreadNotification(order.id);
+        
+        // Start continuous notification sound
+        this.startNotificationSound();
+        
+        // Update notification bell
+        this.updateNotificationBell();
+        
+        // Add to notification panel with yellow background
+        this.addNotificationToPanel(order);
+        
+        // Show desktop notification if supported
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Nouvelle commande!', {
+                body: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName} - ${window.shop.formatPrice(order.total)}`,
+                icon: '/favicon.ico'
             });
         }
+        
+        // Reload orders (without yellow highlighting in table)
+        this.loadAdminOrders();
+        this.loadMobileOrders();
+        
+        // Update dashboard stats
+        this.loadDashboardStats();
+    }
 
-        // Check if admin is already logged in
-        const adminSession = localStorage.getItem('lamiti-admin');
-        if (adminSession) {
-            this.isAdmin = true;
+    addNotificationToPanel(order) {
+        // Get current notifications
+        let notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
+        
+        // Add new notification with unread status
+        const notification = {
+            id: 'notif-' + Date.now(),
+            type: 'new_order',
+            title: 'Nouvelle commande!',
+            message: `Nouvelle commande de ${order.customer.firstName} ${order.customer.lastName} - ${window.shop.formatPrice(order.total)}`,
+            orderId: order.id,
+            timestamp: new Date().toISOString(),
+            read: false
+        };
+        
+        notifications.unshift(notification);
+        
+        // Keep only last 20 notifications
+        if (notifications.length > 20) {
+            notifications = notifications.slice(0, 20);
+        }
+        
+        // Save to localStorage
+        localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+        
+        // Update notification panel
+        this.updateNotificationPanel();
+    }
+
+    startNotificationSound() {
+        if (!this.notificationSound) return;
+        
+        // Stop any existing sound
+        this.stopNotificationSound();
+        
+        // Start new sound with loop
+        this.notificationSound.loop = true;
+        this.notificationSound.currentTime = 0;
+        
+        const playSound = () => {
+            this.notificationSound.play().catch(e => {
+                console.log('Audio playback failed, retrying:', e);
+                setTimeout(playSound, 1000);
+            });
+        };
+        
+        playSound();
+        
+        // Check every second if sound should stop
+        this.notificationSoundInterval = setInterval(() => {
+            this.checkAndStopNotificationSound();
+        }, 1000);
+    }
+
+    stopNotificationSound() {
+        if (this.notificationSound) {
+            this.notificationSound.pause();
+            this.notificationSound.currentTime = 0;
+        }
+        
+        if (this.notificationSoundInterval) {
+            clearInterval(this.notificationSoundInterval);
+            this.notificationSoundInterval = null;
         }
     }
 
-    handleAdminLogin() {
-        const username = document.getElementById('admin-username').value;
-        const password = document.getElementById('admin-password').value;
+    checkAndStopNotificationSound() {
+        // Check if there are any unread notifications
+        const hasUnread = this.hasUnreadNotifications();
+        
+        if (!hasUnread) {
+            // No unread notifications, stop sound
+            this.stopNotificationSound();
+        }
+    }
 
-        // Simple admin authentication (demo)
-        if (username === 'admin' && password === 'lamiti2024') {
-            this.isAdmin = true;
-            localStorage.setItem('lamiti-admin', JSON.stringify({
-                username,
-                loginTime: new Date().toISOString()
-            }));
-            this.showNotification('Connexion admin réussie!', 'success');
+    hasUnreadNotifications() {
+        // Check orders for unread status
+        if (!window.shop) return false;
+        
+        return window.shop.orders.some(order => !order.adminRead);
+    }
+
+    addUnreadNotification(orderId) {
+        let unreadOrders = JSON.parse(localStorage.getItem('lamiti-unread-orders') || '[]');
+        if (!unreadOrders.includes(orderId)) {
+            unreadOrders.push(orderId);
+            localStorage.setItem('lamiti-unread-orders', JSON.stringify(unreadOrders));
+        }
+    }
+
+    removeUnreadNotification(orderId) {
+        let unreadOrders = JSON.parse(localStorage.getItem('lamiti-unread-orders') || '[]');
+        unreadOrders = unreadOrders.filter(id => id !== orderId);
+        localStorage.setItem('lamiti-unread-orders', JSON.stringify(unreadOrders));
+    }
+
+    updateOrderReadStatus(orderId, readStatus) {
+        // Update order in shop data
+        const order = window.shop.orders.find(o => o.id === orderId);
+        if (order) {
+            order.adminRead = readStatus;
+            window.shop.saveOrders();
+        }
+        
+        // Update local storage
+        if (readStatus) {
+            this.removeUnreadNotification(orderId);
         } else {
-            this.showNotification('Identifiants incorrects!', 'error');
+            this.addUnreadNotification(orderId);
         }
     }
 
-    logoutAdmin() {
+    checkForUnreadNotifications() {
+        // Start sound if there are unread orders
+        if (this.hasUnreadNotifications()) {
+            this.startNotificationSound();
+            this.updateNotificationBell();
+        }
+    }
+
+    markOrderAsRead(orderId) {
+        // Update order read status
+        this.updateOrderReadStatus(orderId, true);
+        
+        // Update notification bell
+        this.updateNotificationBell();
+        
+        // Check if sound should stop
+        this.checkAndStopNotificationSound();
+        
+        // Mark notification as read in panel (remove yellow background)
+        this.markNotificationAsReadInPanel(orderId);
+    }
+
+    markNotificationAsReadInPanel(orderId) {
+        // Get notifications
+        let notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
+        
+        // Mark notifications for this order as read
+        notifications.forEach(notification => {
+            if (notification.orderId === orderId) {
+                notification.read = true;
+            }
+        });
+        
+        // Save to localStorage
+        localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+        
+        // Update notification panel
+        this.updateNotificationPanel();
+    }
+
+    updateNotificationBell() {
+        const bell = document.getElementById('notification-bell');
+        const badge = document.getElementById('notification-count');
+        
+        if (bell && badge) {
+            const unreadCount = this.getUnreadOrdersCount();
+            badge.textContent = unreadCount;
+            badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+            
+            if (unreadCount > 0) {
+                bell.classList.add('ringing');
+            } else {
+                bell.classList.remove('ringing');
+            }
+        }
+    }
+
+    getUnreadOrdersCount() {
+        if (!window.shop) return 0;
+        return window.shop.orders.filter(order => !order.adminRead).length;
+    }
+
+    logout() {
         localStorage.removeItem('lamiti-admin');
         this.isAdmin = false;
+        this.stopNotificationSound();
         location.reload();
     }
 
-    // Product CRUD for Admin
-    addProduct(productData) {
-        const newProduct = {
-            id: 'prod' + Date.now(),
-            ...productData,
-            active: true,
-            addedAt: new Date().toISOString()
-        };
-        this.products.push(newProduct);
-        this.saveProducts();
-        this.showNotification('Produit ajouté avec succès!', 'success');
-        return newProduct;
-    }
-
-    updateProduct(productId, updates) {
-        const index = this.products.findIndex(p => p.id === productId);
-        if (index !== -1) {
-            this.products[index] = { ...this.products[index], ...updates };
-            this.saveProducts();
-            this.showNotification('Produit mis à jour!', 'success');
-            return true;
-        }
-        return false;
-    }
-
-    deleteProduct(productId) {
-        if (confirm('Êtes-vous sûr de vouloir supprimer ce produit?')) {
-            this.products = this.products.filter(p => p.id !== productId);
-            this.saveProducts();
-            this.showNotification('Produit supprimé!', 'info');
-            return true;
-        }
-        return false;
-    }
-
-    toggleProductStatus(productId) {
-        const product = this.products.find(p => p.id === productId);
-        if (product) {
-            product.active = !product.active;
-            this.saveProducts();
-            this.showNotification(
-                product.active ? 'Produit activé!' : 'Produit désactivé!',
-                'info'
-            );
-            return true;
-        }
-        return false;
-    }
-
-    // UI Functions avec son pour notifications
     showNotification(message, type = 'info', duration = 3000) {
         // Create notification element
         const notification = document.createElement('div');
@@ -641,11 +1173,6 @@ class LamitiShop {
         `;
         
         document.body.appendChild(notification);
-        
-        // Jouer le son pour les notifications importantes
-        if (type === 'success' || type === 'info') {
-            this.playNotificationSound();
-        }
         
         // Auto remove after duration
         setTimeout(() => {
@@ -665,536 +1192,1224 @@ class LamitiShop {
         }, 100);
     }
 
-    // Fonction pour jouer le son de notification
-    playNotificationSound() {
-        // Vérifier si nous sommes dans l'admin
-        if (document.getElementById('notification-sound')) {
-            const sound = document.getElementById('notification-sound');
-            if (sound) {
-                sound.currentTime = 0;
-                sound.play().catch(e => {
-                    console.log('Audio playback failed:', e);
-                });
-            }
-        } else {
-            // Pour les autres pages, créer un élément audio temporaire
-            const audio = new Audio('resources/natifmp3.mp3');
-            audio.volume = 0.5;
-            audio.play().catch(e => {
-                console.log('Audio playback failed:', e);
-            });
-        }
-    }
-
-    animateAddToCart() {
-        const cartIcon = document.querySelector('.cart-icon');
-        if (cartIcon) {
-            cartIcon.classList.add('bounce');
-            setTimeout(() => {
-                cartIcon.classList.remove('bounce');
-            }, 600);
-        }
-    }
-
-    initializeAnimations() {
-        // Initialize Anime.js animations
-        if (typeof anime !== 'undefined') {
-            // Hero text animation
-            anime({
-                targets: '.hero-title',
-                translateY: [50, 0],
-                opacity: [0, 1],
-                duration: 1000,
-                easing: 'easeOutExpo',
-                delay: 500
-            });
-
-            // Product cards animation
-            anime({
-                targets: '.product-card',
-                translateY: [30, 0],
-                opacity: [0, 1],
-                duration: 800,
-                delay: anime.stagger(100),
-                easing: 'easeOutExpo'
-            });
-        }
-    }
-
-    bindEvents() {
-        // Search functionality
-        const searchInputs = document.querySelectorAll('.search-input');
-        searchInputs.forEach(input => {
-            input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    this.handleSearch(e.target.value);
-                }
-            });
-        });
-
-        // Cart toggle
-        const cartToggle = document.querySelector('.cart-toggle');
-        if (cartToggle) {
-            cartToggle.addEventListener('click', () => {
-                this.toggleCart();
-            });
-        }
-
-        // Listen for order updates
-        document.addEventListener('orderStatusUpdated', (e) => {
-            this.handleOrderStatusUpdate(e.detail);
-        });
-    }
-
-    handleSearch(query) {
-        if (query.trim()) {
-            window.location.href = `products.html?search=${encodeURIComponent(query.trim())}`;
-        }
-    }
-
-    handleOrderStatusUpdate(detail) {
-        const { orderId, newStatus } = detail;
-        const order = this.orders.find(o => o.id === orderId);
+    // Load low stock products
+    loadLowStockProducts() {
+        if (!window.shop) return;
         
-        if (order) {
-            this.showNotification(
-                `Votre commande ${orderId} est maintenant "${this.getStatusLabel(newStatus)}"`,
-                'info'
-            );
+        const lowStockProducts = window.shop.getLowStockProducts();
+        const lowStockTable = document.getElementById('low-stock-table-body');
+        if (!lowStockTable) return;
+
+        let html = '';
+        
+        lowStockProducts.forEach(product => {
+            const stockLevel = product.stock < 2 ? 'Critique' : product.stock < 5 ? 'Faible' : 'Normal';
+            const stockClass = product.stock < 2 ? 'text-red-600' : 'text-yellow-600';
             
-            // If on tracking page, refresh the view
-            if (window.location.pathname.includes('track-order.html')) {
-                window.location.reload();
-            }
-        }
+            html += `
+                <tr>
+                    <td>
+                        <div class="table-image">
+                            <img src="${product.images[0] || 'resources/product-placeholder.jpg'}" alt="${product.name}">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="font-semibold" style="font-size: 0.9rem;">${product.name}</div>
+                    </td>
+                    <td class="capitalize">${product.category}</td>
+                    <td class="font-semibold">${window.shop.formatPrice(product.price)}</td>
+                    <td class="${stockClass} font-semibold">${product.stock}</td>
+                    <td>
+                        <span class="order-status ${product.stock < 2 ? 'status-cancelled' : 'status-pending'}">
+                            ${stockLevel}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="table-actions">
+                            <input type="number" id="stock-${product.id}" value="${product.stock}" min="0" class="stock-input">
+                            <button class="update-stock-btn" onclick="updateProductStock('${product.id}')">💾</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        lowStockTable.innerHTML = html;
     }
 
-    // Customer order tracking page functions
-    displayOrderTracking(order) {
-        if (!order) return '';
+    // LOW STOCK MOBILE VERSION
+    loadMobileLowStock() {
+        if (!window.shop || window.innerWidth > 768) return;
         
-        const timeline = this.getOrderStatusTimeline(order.id);
+        const mobileContainer = document.getElementById('low-stock-mobile-view');
+        if (!mobileContainer) return;
+
+        const lowStockProducts = window.shop.getLowStockProducts();
+        
+        let html = '';
+        
+        lowStockProducts.forEach(product => {
+            const stockLevel = product.stock < 2 ? 'Critique' : product.stock < 5 ? 'Faible' : 'Normal';
+            const stockClass = product.stock < 2 ? 'text-red-600' : 'text-yellow-600';
+            
+            html += `
+                <div class="mobile-table-card" data-product-id="${product.id}">
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Image</div>
+                        <div class="mobile-table-value">
+                            <div class="table-image" style="margin: 0 auto;">
+                                <img src="${product.images[0] || 'resources/product-placeholder.jpg'}" alt="${product.name}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Nom</div>
+                        <div class="mobile-table-value">
+                            <div class="font-semibold">${product.name}</div>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Catégorie</div>
+                        <div class="mobile-table-value capitalize">${product.category}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Prix</div>
+                        <div class="mobile-table-value font-semibold">${window.shop.formatPrice(product.price)}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Stock</div>
+                        <div class="mobile-table-value ${stockClass} font-semibold">${product.stock}</div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Niveau</div>
+                        <div class="mobile-table-value">
+                            <span class="order-status ${product.stock < 2 ? 'status-cancelled' : 'status-pending'}">
+                                ${stockLevel}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="mobile-table-row">
+                        <div class="mobile-table-label">Actions</div>
+                        <div class="mobile-table-value">
+                            <div class="table-actions">
+                                <input type="number" id="stock-mobile-${product.id}" value="${product.stock}" min="0" class="stock-input">
+                                <button class="update-stock-btn" onclick="updateProductStock('${product.id}')">💾</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        mobileContainer.innerHTML = html;
+    }
+
+    updateNotificationPanel() {
+        const container = document.getElementById('notifications-list');
+        if (!container) return;
+        
+        const notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
+        const unreadNotifications = notifications.filter(n => !n.read);
+        const readNotifications = notifications.filter(n => n.read);
+        
+        let html = '';
+        
+        // Add title for new notifications with yellow background
+        if (unreadNotifications.length > 0) {
+            html += `
+                <div class="notification-section-title unread-section">
+                    <span style="font-weight: 700; color: #856404;">${unreadNotifications.length} nouvelle(s) notification(s)</span>
+                    <span class="notification-count-badge">${unreadNotifications.length}</span>
+                </div>
+            `;
+        }
+        
+        // Unread notifications with yellow background
+        unreadNotifications.forEach((notification, index) => {
+            html += this.createNotificationHTML(notification, index, true);
+        });
+        
+        // Add separator if there are both unread and read notifications
+        if (unreadNotifications.length > 0 && readNotifications.length > 0) {
+            html += `
+                <div class="notification-section-title">
+                    <span>Anciennes notifications</span>
+                </div>
+            `;
+        }
+        
+        // Read notifications (no yellow background)
+        readNotifications.forEach((notification, index) => {
+            html += this.createNotificationHTML(notification, index + unreadNotifications.length, false);
+        });
+        
+        if (notifications.length === 0) {
+            html = `
+                <div class="notification-item" style="text-align: center; color: #666; padding: 20px;">
+                    Aucune notification
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+
+    createNotificationHTML(notification, index, isUnread) {
+        const timeAgo = this.getTimeAgo(notification.timestamp);
+        const orderLink = notification.orderId ? 
+            `<span class="notification-item-order" onclick="viewOrderFromNotification('${notification.orderId}')" style="color: #3498db; text-decoration: underline; cursor: pointer;">
+                Voir la commande
+            </span>` : '';
+        
+        // Yellow background for unread notifications
+        const unreadClass = isUnread ? 'unread-notification' : '';
         
         return `
-            <div class="order-tracking-container">
-                <div class="order-header">
-                    <h2>Suivi de commande</h2>
-                    <div class="order-meta">
-                        <div><strong>Numéro:</strong> ${order.id}</div>
-                        <div><strong>Date:</strong> ${new Date(order.orderDate).toLocaleDateString('fr-FR')}</div>
-                        <div><strong>Code de suivi:</strong> <span class="tracking-code">${order.trackingCode}</span></div>
+            <div class="notification-item ${unreadClass}" data-index="${index}" onclick="markNotificationAsReadInPanel(${index})" style="cursor: pointer;">
+                <div class="notification-item-title">
+                    <span style="font-weight: 600;">${isUnread ? '🔔 ' : ''}${notification.title}</span>
+                    <span class="notification-item-time">${timeAgo}</span>
+                </div>
+                <div class="notification-item-message" style="margin: 5px 0;">${notification.message}</div>
+                ${orderLink}
+            </div>
+        `;
+    }
+
+    getTimeAgo(timestamp) {
+        const now = new Date();
+        const past = new Date(timestamp);
+        const diffMs = now - past;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return "À l'instant";
+        if (diffMins < 60) return `Il y a ${diffMins} min`;
+        if (diffHours < 24) return `Il y a ${diffHours} h`;
+        if (diffDays < 7) return `Il y a ${diffDays} j`;
+        return past.toLocaleDateString('fr-FR');
+    }
+}
+
+// Initialize admin manager when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.adminManager = new AdminManager();
+});
+
+// Global functions for admin interface
+function showSection(sectionName) {
+    // Hide all sections
+    document.querySelectorAll('.dashboard-section').forEach(section => {
+        section.classList.remove('active');
+    });
+    
+    // Show selected section
+    document.getElementById(sectionName + '-section').classList.add('active');
+    
+    // Update sidebar menu
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Find and activate the clicked link
+    const clickedLink = event?.target?.closest('.sidebar-link') || 
+        document.querySelector(`.sidebar-link[onclick*="${sectionName}"]`);
+    if (clickedLink) {
+        clickedLink.classList.add('active');
+    }
+    
+    // Close mobile sidebar if open
+    if (window.innerWidth <= 1024) {
+        const sidebar = document.getElementById('admin-sidebar');
+        sidebar.classList.remove('active');
+    }
+    
+    // Load section content
+    switch(sectionName) {
+        case 'dashboard':
+            window.adminManager.loadDashboardStats();
+            window.adminManager.initializeCharts();
+            window.adminManager.loadCustomerStats();
+            break;
+        case 'products':
+            window.adminManager.loadAdminProducts();
+            window.adminManager.loadMobileProducts();
+            break;
+        case 'categories':
+            window.adminManager.loadAdminCategories();
+            break;
+        case 'orders':
+            window.adminManager.loadAdminOrders();
+            window.adminManager.loadMobileOrders();
+            window.adminManager.checkForUnreadNotifications();
+            break;
+        case 'customers':
+            window.adminManager.loadAdminCustomers();
+            window.adminManager.loadMobileCustomers();
+            window.adminManager.loadCustomerStats();
+            break;
+        case 'analytics':
+            loadDetailedAnalytics();
+            break;
+        case 'low-stock':
+            window.adminManager.loadLowStockProducts();
+            window.adminManager.loadMobileLowStock();
+            break;
+    }
+}
+
+function editProduct(productId) {
+    if (window.shop) {
+        // Find the product
+        const product = window.shop.products.find(p => p.id === productId);
+        if (product) {
+            // Open the add product modal in edit mode
+            openAddProductModal();
+            
+            // Set the modal to edit mode
+            document.getElementById('modal-title').textContent = 'Modifier le produit';
+            currentEditingProduct = productId;
+            
+            // Populate form with product data
+            const form = document.getElementById('add-product-form');
+            form.name.value = product.name;
+            form.category.value = product.category;
+            form.price.value = product.price;
+            form.originalPrice.value = product.originalPrice || '';
+            form.stock.value = product.stock;
+            form.sizes.value = product.sizes.join(', ');
+            form.colors.value = product.colors.join(', ');
+            form.description.value = product.description;
+            form.featured.checked = product.featured;
+            form.onSale.checked = product.onSale;
+            
+            // Populate category select
+            const categorySelect = document.getElementById('product-category-select');
+            categorySelect.innerHTML = '<option value="">Sélectionner une catégorie</option>';
+            if (window.shop && window.shop.categories) {
+                window.shop.categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+                    categorySelect.appendChild(option);
+                });
+            }
+            categorySelect.value = product.category;
+
+            // Populate uploaded images
+            uploadedImages = [...product.images];
+            const uploadedImagesContainer = document.getElementById('uploaded-images');
+            uploadedImagesContainer.innerHTML = '';
+            uploadedImages.forEach((image, index) => {
+                const imageDiv = document.createElement('div');
+                imageDiv.className = 'uploaded-image';
+                imageDiv.innerHTML = `
+                    <img src="${image}" alt="Uploaded">
+                    <button class="remove-image" onclick="removeUploadedImage('${image}')">&times;</button>
+                `;
+                uploadedImagesContainer.appendChild(imageDiv);
+            });
+        }
+    }
+}
+
+function toggleProduct(productId) {
+    if (window.shop) {
+        window.shop.toggleProductStatus(productId);
+        // Reload the products table
+        if (window.adminManager) {
+            window.adminManager.loadAdminProducts();
+            window.adminManager.loadMobileProducts();
+        }
+    }
+}
+
+function deleteProduct(productId) {
+    if (window.shop) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+            window.shop.deleteProduct(productId);
+            // Reload the products table
+            if (window.adminManager) {
+                window.adminManager.loadAdminProducts();
+                window.adminManager.loadMobileProducts();
+                window.adminManager.updateCategoriesChart();
+            }
+        }
+    }
+}
+
+function editCategory(categoryName) {
+    const newName = prompt('Modifier le nom de la catégorie:', categoryName);
+    if (newName && newName.trim() && newName !== categoryName) {
+        if (window.shop) {
+            // Update category name in categories array
+            const index = window.shop.categories.indexOf(categoryName);
+            if (index !== -1) {
+                window.shop.categories[index] = newName.trim().toLowerCase();
+                
+                // Update subcategories reference
+                window.shop.subcategories[newName] = window.shop.subcategories[categoryName] || [];
+                delete window.shop.subcategories[categoryName];
+                
+                // Update category image
+                if (window.shop.categoryImages && window.shop.categoryImages[categoryName]) {
+                    window.shop.categoryImages[newName] = window.shop.categoryImages[categoryName];
+                    delete window.shop.categoryImages[categoryName];
+                }
+                
+                // Update products with this category
+                window.shop.products.forEach(product => {
+                    if (product.category === categoryName) {
+                        product.category = newName.trim().toLowerCase();
+                    }
+                });
+                
+                window.shop.saveCategories();
+                window.shop.saveProducts();
+                window.shop.showNotification('Catégorie modifiée avec succès!', 'success');
+                
+                // Reload categories and products
+                if (window.adminManager) {
+                    window.adminManager.loadAdminCategories();
+                    window.adminManager.loadAdminProducts();
+                    window.adminManager.loadMobileProducts();
+                    window.adminManager.updateCategoriesChart();
+                }
+            }
+        }
+    }
+}
+
+function deleteCategory(categoryName) {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer la catégorie "${categoryName}" ? Cette action est irréversible.`)) {
+        if (window.shop) {
+            if (window.shop.deleteCategory(categoryName)) {
+                // Reload categories
+                if (window.adminManager) {
+                    window.adminManager.loadAdminCategories();
+                    window.adminManager.updateCategoriesChart();
+                }
+            }
+        }
+    }
+}
+
+function addSubcategory(categoryName) {
+    const input = document.getElementById(`subcategory-input-${categoryName}`);
+    if (input && window.shop) {
+        const subcategoryName = input.value.trim();
+        
+        if (!subcategoryName) {
+            window.shop.showNotification('Veuillez entrer un nom de sous-catégorie', 'error');
+            return;
+        }
+        
+        if (!window.shop.subcategories[categoryName]) {
+            window.shop.subcategories[categoryName] = [];
+        }
+        
+        if (!window.shop.subcategories[categoryName].includes(subcategoryName)) {
+            window.shop.subcategories[categoryName].push(subcategoryName);
+            window.shop.saveCategories();
+            window.shop.showNotification('Sous-catégorie ajoutée avec succès!', 'success');
+            input.value = '';
+            
+            // Reload categories
+            if (window.adminManager) {
+                window.adminManager.loadAdminCategories();
+            }
+        } else {
+            window.shop.showNotification('Cette sous-catégorie existe déjà!', 'error');
+        }
+    }
+}
+
+function removeSubcategory(categoryName, subcategoryName) {
+    if (confirm(`Supprimer la sous-catégorie "${subcategoryName}" ?`)) {
+        if (window.shop) {
+            window.shop.subcategories[categoryName] = window.shop.subcategories[categoryName].filter(
+                sub => sub !== subcategoryName
+            );
+            window.shop.saveCategories();
+            window.shop.showNotification('Sous-catégorie supprimée!', 'info');
+            
+            // Reload categories
+            if (window.adminManager) {
+                window.adminManager.loadAdminCategories();
+            }
+        }
+    }
+}
+
+function viewOrderDetails(orderId) {
+    if (window.shop) {
+        const order = window.shop.orders.find(o => o.id === orderId);
+        if (order) {
+            currentEditingOrder = orderId;
+            
+            // Mark order as read when viewing details
+            if (window.adminManager) {
+                window.adminManager.markOrderAsRead(orderId);
+            }
+            
+            const content = `
+                <div class="order-info">
+                    <div class="order-section">
+                        <h3 class="font-semibold mb-3">Informations client</h3>
+                        <div class="space-y-2">
+                            <div><strong>Nom:</strong> ${order.customer.firstName} ${order.customer.lastName}</div>
+                            <div><strong>Email:</strong> ${order.customer.email}</div>
+                            <div><strong>Téléphone:</strong> ${order.customer.phone}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="order-section">
+                        <h3 class="font-semibold mb-3">Adresse de livraison</h3>
+                        <div class="space-y-2">
+                            <div><strong>Adresse:</strong> ${order.shippingAddress.address}</div>
+                            <div><strong>Ville:</strong> ${order.shippingAddress.city}</div>
+                            <div><strong>Code postal:</strong> ${order.shippingAddress.zipCode}</div>
+                            <div><strong>Pays:</strong> ${order.shippingAddress.country}</div>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="current-status">
-                    <h3>Statut actuel</h3>
-                    <div class="status-badge status-${order.status}">
-                        ${this.getStatusLabel(order.status)}
+                <div class="order-section">
+                    <h3 class="font-semibold mb-3">Informations de commande</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><strong>ID:</strong> ${order.id}</div>
+                        <div><strong>Date:</strong> ${new Date(order.orderDate).toLocaleDateString('fr-FR')}</div>
+                        <div><strong>Statut:</strong> <span class="order-status status-${order.status}">${getStatusLabel(order.status)}</span></div>
+                        <div><strong>Paiement:</strong> ${order.paymentMethod === 'card' ? 'Carte bancaire' : 'Paiement mobile'}</div>
+                        <div><strong>Total:</strong> ${window.shop.formatPrice(order.total)}</div>
+                        <div><strong>Code suivi:</strong> ${order.trackingCode}</div>
                     </div>
-                    ${order.estimatedDelivery ? `
-                        <div class="estimated-delivery">
-                            Livraison estimée: ${new Date(order.estimatedDelivery).toLocaleDateString('fr-FR')}
-                        </div>
-                    ` : ''}
                 </div>
                 
                 <div class="order-timeline">
-                    <h3>Historique du statut</h3>
-                    ${timeline.map((status, index) => `
-                        <div class="timeline-item ${index === timeline.length - 1 ? 'current' : 'completed'}">
-                            <div class="timeline-icon">${index + 1}</div>
-                            <div class="timeline-content">
-                                <div class="status-label">${this.getStatusLabel(status.status)}</div>
-                                <div class="status-time">${new Date(status.timestamp).toLocaleString('fr-FR')}</div>
-                                ${status.note ? `<div class="status-note">${status.note}</div>` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
+                    <h3 class="font-semibold mb-3">Suivi de commande</h3>
+                    ${renderOrderTimeline(order)}
                 </div>
                 
-                <div class="order-details">
-                    <h3>Détails de la commande</h3>
-                    <div class="details-grid">
-                        <div>
-                            <h4>Adresse de livraison</h4>
-                            <p>${order.shippingAddress.address}</p>
-                            <p>${order.shippingAddress.city}, ${order.shippingAddress.zipCode}</p>
-                            <p>${order.shippingAddress.country}</p>
-                        </div>
-                        <div>
-                            <h4>Articles commandés</h4>
-                            ${order.items.map(item => {
-                                const product = this.products.find(p => p.id === item.productId);
-                                return `
-                                    <div class="order-item">
-                                        <span>${product ? product.name : 'Produit'} × ${item.quantity}</span>
-                                        <span>${window.shop.formatPrice(product ? product.price * item.quantity : 0)}</span>
+                <div class="order-items">
+                    <h3 class="font-semibold mb-3">Articles commandés</h3>
+                    ${order.items.map(item => {
+                        const product = window.shop.products.find(p => p.id === item.productId);
+                        return `
+                            <div class="order-item">
+                                <div class="order-item-image">
+                                    <img src="${product ? product.images[0] : ''}" alt="${product ? product.name : 'Produit'}">
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-semibold">${product ? product.name : 'Produit inconnu'}</div>
+                                    <div class="text-sm text-gray-600">
+                                        ${item.size ? `Taille: ${item.size}` : ''}
+                                        ${item.color ? `Couleur: ${item.color}` : ''}
+                                        Quantité: ${item.quantity}
                                     </div>
-                                `;
-                            }).join('')}
-                            <div class="order-total">
-                                <strong>Total:</strong>
-                                <strong>${this.formatPrice(order.total)}</strong>
+                                    <div class="font-semibold text-right">
+                                        ${window.shop.formatPrice(product ? product.price * item.quantity : 0)}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        `;
+                    }).join('')}
                 </div>
-            </div>
-        `;
-    }
-
-    filterByCategory(category) {
-        const filteredProducts = category === 'all' 
-            ? this.products 
-            : this.products.filter(product => product.category === category);
-        this.displayProducts(filteredProducts);
-    }
-
-    displayProducts(products, container = null) {
-        const targetContainer = container || document.querySelector('.products-grid');
-        if (!targetContainer) return;
-
-        targetContainer.innerHTML = products.map(product => `
-            <div class="product-card" data-product-id="${product.id}">
-                <div class="product-image">
-                    <img src="${product.images[0]}" alt="${product.name}" loading="lazy">
-                    ${product.onSale ? '<span class="sale-badge">SOLDES</span>' : ''}
-                    <div class="product-overlay">
-                        <button class="quick-view-btn" onclick="shop.quickView('${product.id}')">
-                            Aperçu rapide
-                        </button>
-                    </div>
-                </div>
-                <div class="product-info">
-                    <h3 class="product-name">${product.name}</h3>
-                    <div class="product-price">
-                        ${product.onSale 
-                            ? `<span class="original-price">${this.formatPrice(product.originalPrice)}</span>
-                               <span class="sale-price">${this.formatPrice(product.price)}</span>`
-                            : `<span class="price">${this.formatPrice(product.price)}</span>`
-                        }
-                    </div>
-                    <div class="product-stock">
-                        Stock: ${product.stock > 0 ? product.stock : 'Rupture'}
-                    </div>
-                    <button class="add-to-cart-btn" 
-                            onclick="shop.addToCart('${product.id}', 1)"
-                            ${product.stock <= 0 ? 'disabled' : ''}>
-                        ${product.stock > 0 ? 'Ajouter au panier' : 'Rupture de stock'}
+                
+                <div class="flex gap-4 mt-6 flex-wrap">
+                    <button class="add-product-btn" onclick="openUpdateOrderStatusModal('${order.id}')">
+                        Mettre à jour le statut
+                    </button>
+                    <button class="action-btn delete-btn" onclick="deleteOrder('${order.id}')">
+                        Supprimer la commande
                     </button>
                 </div>
-            </div>
-        `).join('');
-    }
-
-    quickView(productId) {
-        const product = this.products.find(p => p.id === productId);
-        if (!product) return;
-
-        // Create modal if it doesn't exist
-        this.createQuickViewModal();
-        
-        // Populate modal content
-        this.populateQuickViewModal(product);
-        
-        // Show modal
-        const modal = document.getElementById('quick-view-modal');
-        if (modal) {
-            modal.classList.add('active');
-            document.body.style.overflow = 'hidden';
+            `;
+            
+            document.getElementById('order-details-content').innerHTML = content;
+            
+            const modal = document.getElementById('order-details-modal');
+            if (modal) {
+                modal.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
         }
     }
+}
 
-    createQuickViewModal() {
-        if (document.getElementById('quick-view-modal')) return;
-
-        const modalHTML = `
-            <div class="modal-overlay" id="quick-view-modal">
-                <div class="modal-content">
-                    <button class="modal-close" onclick="shop.closeQuickView()">&times;</button>
-                    <div class="quick-view-content">
-                        <div class="quick-view-image">
-                            <img id="qv-image" src="" alt="">
-                            <div class="image-gallery" id="qv-gallery"></div>
-                        </div>
-                        <div class="quick-view-info">
-                            <h2 id="qv-name"></h2>
-                            <div class="price" id="qv-price"></div>
-                            <p class="description" id="qv-description"></p>
-                            <div class="options">
-                                <div class="size-options">
-                                    <label>Taille:</label>
-                                    <select class="size-select" id="qv-size">
-                                        <option value="">Sélectionner une taille</option>
-                                    </select>
-                                </div>
-                                <div class="color-options">
-                                    <label>Couleur:</label>
-                                    <select class="color-select" id="qv-color">
-                                        <option value="">Sélectionner une couleur</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <button class="add-to-cart-btn" onclick="shop.addToCartFromQuickView()">
-                                Ajouter au panier
-                            </button>
-                        </div>
+function renderOrderTimeline(order) {
+    const statusOrder = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+    const statusLabels = {
+        'pending': 'En attente',
+        'confirmed': 'Confirmée',
+        'shipped': 'Expédiée',
+        'delivered': 'Livrée',
+        'cancelled': 'Annulée'
+    };
+    
+    let html = '';
+    
+    // Get status history or create default
+    const statusHistory = order.statusHistory || [
+        { status: 'pending', timestamp: order.orderDate, note: 'Commande créée' }
+    ];
+    
+    statusHistory.forEach((history, index) => {
+        const isLast = index === statusHistory.length - 1;
+        const isCurrent = history.status === order.status;
+        
+        html += `
+            <div class="timeline-item ${isLast ? 'current' : 'completed'}">
+                <div class="font-semibold">${statusLabels[history.status] || history.status}</div>
+                <div class="timeline-content">
+                    ${history.note || 'Mise à jour du statut'}
+                    <div class="timeline-time">
+                        ${new Date(history.timestamp).toLocaleString('fr-FR')}
                     </div>
                 </div>
             </div>
         `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-    }
+    });
+    
+    return html;
+}
 
-    populateQuickViewModal(product) {
-        document.getElementById('qv-image').src = product.images[0];
-        document.getElementById('qv-name').textContent = product.name;
-        document.getElementById('qv-price').textContent = this.formatPrice(product.price);
-        document.getElementById('qv-description').textContent = product.description;
-        
-        // Populate image gallery
-        const gallery = document.getElementById('qv-gallery');
-        if (gallery) {
-            gallery.innerHTML = product.images.map((image, index) => `
-                <img src="${image}" 
-                     alt="${product.name} - Image ${index + 1}" 
-                     onclick="shop.changeQuickViewImage(${index})"
-                     class="${index === 0 ? 'active' : ''}">
-            `).join('');
+function markOrderNotificationAsRead(orderId) {
+    // Load notifications
+    const notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
+    
+    // Find and mark notification as read
+    notifications.forEach(notification => {
+        if (notification.orderId === orderId) {
+            notification.read = true;
+        }
+    });
+    
+    // Save notifications
+    localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+    
+    // Update UI
+    updateNotificationBadge();
+    updateNotificationPanel();
+}
+
+function updateOrderStatus(orderId, newStatus) {
+    if (window.shop) {
+        const statuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+        const order = window.shop.orders.find(o => o.id === orderId);
+        if (order) {
+            const currentIndex = statuses.indexOf(order.status);
+            const nextIndex = (currentIndex + 1) % statuses.length;
+            const newStatus = statuses[nextIndex];
+            
+            window.shop.updateOrderStatus(orderId, newStatus);
+            window.shop.showNotification(`Statut mis à jour: ${getStatusLabel(newStatus)}`, 'success');
+            
+            // Reload orders
+            if (window.adminManager) {
+                window.adminManager.loadAdminOrders();
+                window.adminManager.loadMobileOrders();
+            }
+        }
+    }
+}
+
+function deleteOrder(orderId) {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette commande ?')) {
+        if (window.shop) {
+            window.shop.orders = window.shop.orders.filter(o => o.id !== orderId);
+            localStorage.setItem('lamiti-orders', JSON.stringify(window.shop.orders));
+            window.shop.showNotification('Commande supprimée avec succès!', 'info');
+            
+            // Remove from unread notifications
+            if (window.adminManager) {
+                window.adminManager.updateOrderReadStatus(orderId, true);
+            }
+            
+            // Reload orders
+            if (window.adminManager) {
+                window.adminManager.loadAdminOrders();
+                window.adminManager.loadMobileOrders();
+            }
+            
+            closeOrderDetailsModal();
+        }
+    }
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        'pending': 'En attente',
+        'confirmed': 'Confirmée',
+        'shipped': 'Expédiée',
+        'delivered': 'Livrée',
+        'cancelled': 'Annulée'
+    };
+    return labels[status] || status;
+}
+
+// Global variables
+let uploadedImages = [];
+let currentEditingProduct = null;
+let currentEditingOrder = null;
+let currentEditingCategory = null;
+let categoryImages = [];
+
+// Modal functions
+function openAddProductModal() {
+    currentEditingProduct = null;
+    document.getElementById('modal-title').textContent = 'Ajouter un produit';
+    document.getElementById('add-product-form').reset();
+    uploadedImages = [];
+    document.getElementById('uploaded-images').innerHTML = '';
+    
+    // Populate category select
+    const categorySelect = document.getElementById('product-category-select');
+    categorySelect.innerHTML = '<option value="">Sélectionner une catégorie</option>';
+    if (window.shop && window.shop.categories) {
+        window.shop.categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+            categorySelect.appendChild(option);
+        });
+    }
+    
+    const modal = document.getElementById('add-product-modal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddProductModal() {
+    const modal = document.getElementById('add-product-modal');
+    modal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+    
+    // Reset form
+    document.getElementById('add-product-form').reset();
+    uploadedImages = [];
+    document.getElementById('uploaded-images').innerHTML = '';
+    currentEditingProduct = null;
+}
+
+function openAddCategoryModal() {
+    document.getElementById('add-category-form').reset();
+    categoryImages = [];
+    document.getElementById('category-uploaded-images').innerHTML = '';
+    
+    const modal = document.getElementById('add-category-modal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAddCategoryModal() {
+    const modal = document.getElementById('add-category-modal');
+    modal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+    
+    // Reset form
+    document.getElementById('add-category-form').reset();
+    categoryImages = [];
+    document.getElementById('category-uploaded-images').innerHTML = '';
+}
+
+function closeOrderDetailsModal() {
+    const modal = document.getElementById('order-details-modal');
+    modal.classList.remove('active');
+    document.body.style.overflow = 'auto';
+    currentEditingOrder = null;
+}
+
+function closeUpdateOrderStatusModal() {
+    const modal = document.getElementById('update-order-status-modal');
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = 'auto';
+    }
+}
+
+// Image handling functions
+function handleImageUpload(event) {
+    const files = event.target.files;
+    const uploadedImagesContainer = document.getElementById('uploaded-images');
+    
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedImages.push(e.target.result);
+                
+                const imageDiv = document.createElement('div');
+                imageDiv.className = 'uploaded-image';
+                imageDiv.innerHTML = `
+                    <img src="${e.target.result}" alt="Uploaded">
+                    <button class="remove-image" onclick="removeUploadedImage('${e.target.result}')">&times;</button>
+                `;
+                
+                uploadedImagesContainer.appendChild(imageDiv);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+function handleCategoryImageUpload(event) {
+    const files = event.target.files;
+    const uploadedImagesContainer = document.getElementById('category-uploaded-images');
+    
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                categoryImages = [e.target.result]; // Only one image for category
+                
+                const imageDiv = document.createElement('div');
+                imageDiv.className = 'uploaded-image';
+                imageDiv.innerHTML = `
+                    <img src="${e.target.result}" alt="Uploaded">
+                    <button class="remove-image" onclick="removeCategoryImage('${e.target.result}')">&times;</button>
+                `;
+                
+                uploadedImagesContainer.innerHTML = '';
+                uploadedImagesContainer.appendChild(imageDiv);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+function removeUploadedImage(imageSrc) {
+    uploadedImages = uploadedImages.filter(img => img !== imageSrc);
+    const imageDiv = document.querySelector(`img[src="${imageSrc}"]`).parentElement;
+    imageDiv.remove();
+}
+
+function removeCategoryImage(imageSrc) {
+    categoryImages = categoryImages.filter(img => img !== imageSrc);
+    const imageDiv = document.querySelector(`img[src="${imageSrc}"]`).parentElement;
+    imageDiv.remove();
+}
+
+// Form handlers
+function handleAddProduct(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const productData = {
+        name: formData.get('name'),
+        category: formData.get('category'),
+        price: parseInt(formData.get('price')),
+        originalPrice: parseInt(formData.get('originalPrice')) || null,
+        stock: parseInt(formData.get('stock')),
+        sizes: formData.get('sizes').split(',').map(s => s.trim()).filter(s => s),
+        colors: formData.get('colors').split(',').map(s => s.trim()).filter(s => s),
+        description: formData.get('description'),
+        featured: formData.has('featured'),
+        onSale: formData.has('onSale'),
+        images: uploadedImages.length > 0 ? uploadedImages : ['resources/product-placeholder.jpg']
+    };
+    
+    if (currentEditingProduct) {
+        // Update existing product
+        window.shop.updateProduct(currentEditingProduct, productData);
+        window.shop.showNotification('Produit mis à jour avec succès!', 'success');
+    } else {
+        // Add new product
+        window.shop.addProduct(productData);
+    }
+    
+    closeAddProductModal();
+    if (window.adminManager) {
+        window.adminManager.loadAdminProducts();
+        window.adminManager.loadMobileProducts();
+        window.adminManager.updateCategoriesChart();
+    }
+}
+
+function handleAddCategory(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const categoryData = {
+        name: formData.get('name').trim().toLowerCase(),
+        subcategories: formData.get('subcategories').split(',').map(s => s.trim()).filter(s => s),
+        image: categoryImages.length > 0 ? categoryImages[0] : null
+    };
+    
+    if (window.shop.addCategory(categoryData.name, categoryData.subcategories, categoryData.image)) {
+        closeAddCategoryModal();
+        if (window.adminManager) {
+            window.adminManager.loadAdminCategories();
+            window.adminManager.updateCategoriesChart();
+        }
+    }
+}
+
+// Stock management
+function updateProductStock(productId) {
+    let stockInput;
+    if (window.innerWidth <= 768) {
+        stockInput = document.getElementById(`stock-mobile-${productId}`);
+    } else {
+        stockInput = document.getElementById(`stock-${productId}`);
+    }
+    
+    if (stockInput && window.shop) {
+        const newStock = parseInt(stockInput.value);
+        if (!isNaN(newStock) && newStock >= 0) {
+            const product = window.shop.products.find(p => p.id === productId);
+            if (product) {
+                product.stock = newStock;
+                window.shop.saveProducts();
+                window.shop.showNotification('Stock mis à jour!', 'success');
+                
+                // Reload low stock products
+                if (window.adminManager) {
+                    window.adminManager.loadLowStockProducts();
+                    window.adminManager.loadMobileLowStock();
+                    window.adminManager.loadDashboardStats();
+                }
+            }
+        }
+    }
+}
+
+// Category image change
+function changeCategoryImage(categoryName) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (window.shop) {
+                    if (!window.shop.categoryImages) {
+                        window.shop.categoryImages = {};
+                    }
+                    window.shop.categoryImages[categoryName] = e.target.result;
+                    window.shop.saveCategoryImages();
+                    window.shop.showNotification('Image de catégorie mise à jour!', 'success');
+                    if (window.adminManager) {
+                        window.adminManager.loadAdminCategories();
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    input.click();
+}
+
+// Detailed analytics
+function loadDetailedAnalytics() {
+    if (typeof echarts !== 'undefined') {
+        // Detailed Sales Chart
+        const detailedSalesChartEl = document.getElementById('detailed-sales-chart');
+        if (detailedSalesChartEl) {
+            const detailedSalesChart = echarts.init(detailedSalesChartEl);
+            const detailedSalesOption = {
+                title: {
+                    text: 'Analyse détaillée des ventes',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: window.innerWidth <= 768 ? 12 : 14
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                legend: {
+                    data: ['Ventes', 'Bénéfices', 'Commandes'],
+                    textStyle: {
+                        fontSize: window.innerWidth <= 768 ? 10 : 12
+                    }
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun'],
+                    axisLabel: {
+                        fontSize: window.innerWidth <= 768 ? 10 : 12
+                    }
+                },
+                yAxis: [
+                    {
+                        type: 'value',
+                        name: 'FCFA',
+                        axisLabel: {
+                            formatter: '{value} FCFA',
+                            fontSize: window.innerWidth <= 768 ? 10 : 12
+                        }
+                    },
+                    {
+                        type: 'value',
+                        name: 'Commandes',
+                        axisLabel: {
+                            formatter: '{value}',
+                            fontSize: window.innerWidth <= 768 ? 10 : 12
+                        }
+                    }
+                ],
+                series: [
+                    {
+                        name: 'Ventes',
+                        type: 'bar',
+                        data: [120000, 200000, 150000, 80000, 70000, 110000],
+                        itemStyle: {
+                            color: '#d4af37'
+                        }
+                    },
+                    {
+                        name: 'Bénéfices',
+                        type: 'line',
+                        data: [30000, 50000, 35000, 20000, 15000, 25000],
+                        itemStyle: {
+                            color: '#27ae60'
+                        }
+                    },
+                    {
+                        name: 'Commandes',
+                        type: 'line',
+                        yAxisIndex: 1,
+                        data: [12, 25, 18, 10, 8, 15],
+                        itemStyle: {
+                            color: '#3498db'
+                        }
+                    }
+                ],
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                }
+            };
+            detailedSalesChart.setOption(detailedSalesOption);
+            
+            // Handle resize
+            window.addEventListener('resize', function() {
+                detailedSalesChart.resize();
+            });
         }
         
-        // Populate size options
-        const sizeSelect = document.getElementById('qv-size');
-        sizeSelect.innerHTML = '<option value="">Sélectionner une taille</option>';
-        product.sizes.forEach(size => {
-            const option = document.createElement('option');
-            option.value = size;
-            option.textContent = size;
-            sizeSelect.appendChild(option);
-        });
-        
-        // Populate color options
-        const colorSelect = document.getElementById('qv-color');
-        colorSelect.innerHTML = '<option value="">Sélectionner une couleur</option>';
-        product.colors.forEach(color => {
-            const option = document.createElement('option');
-            option.value = color;
-            option.textContent = color;
-            colorSelect.appendChild(option);
-        });
-        
-        // Store current product
-        this.currentQuickViewProduct = product;
-        this.currentQuickViewImageIndex = 0;
-    }
-
-    changeQuickViewImage(index) {
-        if (this.currentQuickViewProduct && this.currentQuickViewProduct.images[index]) {
-            document.getElementById('qv-image').src = this.currentQuickViewProduct.images[index];
-            this.currentQuickViewImageIndex = index;
+        // Products Performance Chart
+        const productsChartEl = document.getElementById('products-performance-chart');
+        if (productsChartEl) {
+            const productsChart = echarts.init(productsChartEl);
+            const productsOption = {
+                title: {
+                    text: 'Performance des produits',
+                    left: 'center',
+                    textStyle: {
+                        fontSize: window.innerWidth <= 768 ? 12 : 14
+                    }
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['Sac Cuir', 'Blazer', 'Montre', 'Lunettes', 'Robe', 'Chemise'],
+                    axisLabel: {
+                        fontSize: window.innerWidth <= 768 ? 10 : 12,
+                        rotate: window.innerWidth <= 768 ? 45 : 0
+                    }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLabel: {
+                        formatter: '{value}',
+                        fontSize: window.innerWidth <= 768 ? 10 : 12
+                    }
+                },
+                series: [{
+                    name: 'Ventes',
+                    type: 'bar',
+                    data: [8, 15, 5, 12, 10, 7],
+                    itemStyle: {
+                        color: '#d4af37'
+                    }
+                }],
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: window.innerWidth <= 768 ? '15%' : '3%',
+                    containLabel: true
+                }
+            };
+            productsChart.setOption(productsOption);
             
-            // Update active state in gallery
-            const galleryImages = document.querySelectorAll('#qv-gallery img');
-            galleryImages.forEach((img, i) => {
-                img.classList.toggle('active', i === index);
+            // Handle resize
+            window.addEventListener('resize', function() {
+                productsChart.resize();
             });
         }
     }
+}
 
-    closeQuickView() {
-        const modal = document.getElementById('quick-view-modal');
-        if (modal) {
-            modal.classList.remove('active');
-            document.body.style.overflow = 'auto';
-        }
-        this.currentQuickViewProduct = null;
-        this.currentQuickViewImageIndex = 0;
+// Close modals when clicking outside
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-overlay')) {
+        closeAddProductModal();
+        closeAddCategoryModal();
+        closeOrderDetailsModal();
+        closeUpdateOrderStatusModal();
     }
+});
 
-    addToCartFromQuickView() {
-        if (!this.currentQuickViewProduct) return;
+// Close modals with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeAddProductModal();
+        closeAddCategoryModal();
+        closeOrderDetailsModal();
+        closeUpdateOrderStatusModal();
+    }
+});
+
+// Listen for data updates
+document.addEventListener('shopDataUpdate', function() {
+    if (window.adminManager && window.adminManager.isAdmin) {
+        window.adminManager.loadDashboardStats();
+        window.adminManager.updateCategoriesChart();
+        window.adminManager.loadCustomerStats();
+    }
+});
+
+// Notification functions
+function toggleNotificationPanel() {
+    const panel = document.getElementById('notification-panel');
+    const bell = document.getElementById('notification-bell');
+    
+    if (panel && panel.classList.contains('show')) {
+        panel.classList.remove('show');
+        isNotificationPanelOpen = false;
+    } else if (panel) {
+        panel.classList.add('show');
+        isNotificationPanelOpen = true;
         
-        const size = document.getElementById('qv-size').value;
-        const color = document.getElementById('qv-color').value;
-        
-        if (this.addToCart(this.currentQuickViewProduct.id, 1, size, color)) {
-            this.closeQuickView();
+        // Stop bell animation
+        if (bell) {
+            bell.classList.remove('ringing');
         }
     }
+}
 
-    closeAllModals() {
-        const modals = document.querySelectorAll('.modal-overlay.active');
-        modals.forEach(modal => {
-            modal.classList.remove('active');
-        });
-        document.body.style.overflow = 'auto';
+function markAllNotificationsAsRead() {
+    // Get all notifications
+    let notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
+    
+    // Mark all as read
+    notifications.forEach(notification => {
+        notification.read = true;
+    });
+    
+    // Save to localStorage
+    localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+    
+    // Mark all orders as read
+    if (window.adminManager) {
+        // Mark all orders as read
+        if (window.shop) {
+            window.shop.orders.forEach(order => {
+                window.adminManager.updateOrderReadStatus(order.id, true);
+            });
+        }
+        
+        // Stop notification sound
+        window.adminManager.stopNotificationSound();
+        
+        // Update notification bell
+        window.adminManager.updateNotificationBell();
     }
-
-    formatPrice(price) {
-        return new Intl.NumberFormat('fr-FR', {
-            style: 'currency',
-            currency: 'XAF',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(price);
+    
+    // Update notification panel
+    updateNotificationPanel();
+    
+    // Show confirmation
+    if (window.shop) {
+        window.shop.showNotification('Toutes les notifications marquées comme lues', 'success');
     }
+}
 
-    // Real-time updates simulation
-    initializeRealTimeUpdates() {
-        // Simulate real-time stock updates
-        setInterval(() => {
-            this.simulateStockUpdates();
-        }, 30000); // Every 30 seconds
+function clearAllNotifications() {
+    if (confirm('Êtes-vous sûr de vouloir effacer toutes les notifications ?')) {
+        localStorage.setItem('lamiti-notifications', JSON.stringify([]));
+        updateNotificationPanel();
+        
+        // Show confirmation
+        if (window.shop) {
+            window.shop.showNotification('Notifications effacées', 'info');
+        }
     }
+}
 
-    // Mobile detection and optimization
-    isMobile() {
-        return window.innerWidth <= 768;
+function updateNotificationBadge() {
+    // This is now handled by adminManager
+}
+
+function updateNotificationPanel() {
+    if (window.adminManager) {
+        window.adminManager.updateNotificationPanel();
     }
+}
 
-    // Optimize for mobile devices
-    optimizeForMobile() {
-        if (this.isMobile()) {
-            // Reduce animation complexity on mobile
-            if (typeof anime !== 'undefined') {
-                anime.suspendWhenDocumentHidden = true;
+function markNotificationAsReadInPanel(index) {
+    // Get notifications
+    let notifications = JSON.parse(localStorage.getItem('lamiti-notifications') || '[]');
+    
+    if (notifications[index]) {
+        notifications[index].read = true;
+        
+        // If this notification has an order ID, mark the order as read
+        if (notifications[index].orderId && window.adminManager) {
+            window.adminManager.markOrderAsRead(notifications[index].orderId);
+        }
+        
+        localStorage.setItem('lamiti-notifications', JSON.stringify(notifications));
+        updateNotificationPanel();
+    }
+}
+
+function viewOrderFromNotification(orderId) {
+    // Close notification panel
+    toggleNotificationPanel();
+    
+    // Show orders section
+    showSection('orders');
+    
+    // Find and highlight the order
+    setTimeout(() => {
+        const orderRow = document.querySelector(`[data-order-id="${orderId}"]`);
+        if (orderRow) {
+            // Scroll to the order
+            orderRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Mark order as read
+            if (window.adminManager) {
+                window.adminManager.markOrderAsRead(orderId);
             }
             
-            // Optimize touch interactions
-            document.addEventListener('touchstart', function() {}, { passive: true });
-            document.addEventListener('touchmove', function() {}, { passive: true });
+            // Open order details
+            viewOrderDetails(orderId);
+        } else {
+            // If order not found in current view, reload orders
+            if (window.adminManager) {
+                window.adminManager.loadAdminOrders();
+                window.adminManager.loadMobileOrders();
+            }
+            setTimeout(() => {
+                viewOrderFromNotification(orderId);
+            }, 500);
         }
-    }
-
-    simulateStockUpdates() {
-        // Randomly update stock for demo purposes
-        this.products.forEach(product => {
-            if (Math.random() < 0.1) { // 10% chance
-                const change = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
-                product.stock = Math.max(0, product.stock + change);
-            }
-        });
-        this.saveProducts();
-    }
-
-    notifyDataChange() {
-        // Notify other components of data change
-        const event = new CustomEvent('shopDataUpdate', {
-            detail: { 
-                products: this.products, 
-                orders: this.orders,
-                categories: this.categories,
-                subcategories: this.subcategories,
-                categoryImages: this.categoryImages
-            }
-        });
-        document.dispatchEvent(event);
-    }
-
-    // Email simulation
-    sendOrderConfirmation(order) {
-        console.log(`Order confirmation sent to ${order.customer.email} for order ${order.id}`);
-        
-        // Store confirmation for customer
-        const confirmations = JSON.parse(localStorage.getItem('lamiti-order-confirmations') || '[]');
-        confirmations.push({
-            orderId: order.id,
-            email: order.customer.email,
-            sentAt: new Date().toISOString()
-        });
-        localStorage.setItem('lamiti-order-confirmations', JSON.stringify(confirmations));
-    }
-
-    sendStatusUpdateNotification(order) {
-        console.log(`Status update sent to ${order.customer.email} for order ${order.id}: ${order.status}`);
-        
-        // Dispatch event for real-time updates
-        const event = new CustomEvent('orderStatusUpdated', {
-            detail: {
-                orderId: order.id,
-                newStatus: order.status
-            }
-        });
-        document.dispatchEvent(event);
-    }
-
-    // Customer management
-    getCustomerStats(email) {
-        const customerOrders = this.getCustomerOrders(email);
-        const totalSpent = customerOrders.reduce((sum, order) => sum + order.total, 0);
-        const totalOrders = customerOrders.length;
-        
-        return {
-            totalSpent,
-            totalOrders,
-            averageOrder: totalOrders > 0 ? totalSpent / totalOrders : 0,
-            lastOrder: customerOrders.length > 0 ? customerOrders[customerOrders.length - 1] : null
-        };
-    }
-
-    toggleCart() {
-        const cartSidebar = document.getElementById('cart-sidebar');
-        if (cartSidebar) {
-            cartSidebar.classList.toggle('active');
-        }
-    }
-
-    // Get low stock products
-    getLowStockProducts(threshold = 5) {
-        return this.products.filter(p => p.stock <= threshold && p.active);
-    }
-
-    // Get category statistics for charts
-    getCategoryStats() {
-        const stats = {};
-        this.categories.forEach(category => {
-            stats[category] = this.products.filter(p => p.category === category).length;
-        });
-        return stats;
-    }
+    }, 500);
 }
 
-// Initialize the shop when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.shop = new LamitiShop();
-});
-
-// Utility functions
-function toggleModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.toggle('active');
+// Check for new orders periodically
+setInterval(() => {
+    if (window.adminManager && window.adminManager.isAdmin) {
+        window.adminManager.checkForUnreadNotifications();
     }
-}
-
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.classList.remove('active');
-    }
-}
-
-// Handle escape key for modals
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        const activeModals = document.querySelectorAll('.modal-overlay.active');
-        activeModals.forEach(modal => {
-            modal.classList.remove('active');
-        });
-        document.body.style.overflow = 'auto';
-    }
-});
-
-// Close modal when clicking outside
-document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) {
-        e.target.classList.remove('active');
-        document.body.style.overflow = 'auto';
-    }
-});
-
-// Export for use in other files
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = LamitiShop;
-}
+}, 3000); // Check every 3 seconds
